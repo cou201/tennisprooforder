@@ -6,8 +6,11 @@
   color: #000;
   width: 100%;
   background-color: #fff;
+  color-scheme: light;
 }
-
+* {
+  color-interpolation: sRGB;
+}
 /* --- TOP BAR (Barra gris superior) --- */
 .top-bar {
   background-color: #f4f4f4;

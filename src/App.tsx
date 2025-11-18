@@ -27,16 +27,15 @@ import logoGif from "./arquivos/tennislogo.gif";
 type ImageType = {
   id: string;
   url: string;
+  name?: string; // Opcional: útil para depurar
 };
 
 const LOCAL_STORAGE_KEY = "savedImages";
 
 // --- CONFIGURACIÓN DE PAGINACIÓN ---
-// Asumimos: 4 columnas x 4 filas = 16 productos por página visualmente.
-// 3 Páginas por archivo PDF = 16 * 3 = 48 productos por archivo.
 const ITEMS_PER_PDF_FILE = 48;
 
-// --- Iconos SVG inline ---
+// ... (MANTÉN LOS ICONOS SVG IGUAL QUE ANTES: SearchIcon, LocationIcon, etc.) ...
 const SearchIcon = () => (
   <svg
     width="20"
@@ -98,6 +97,7 @@ const CartIcon = () => (
   </svg>
 );
 
+// ... (MANTÉN EL COMPONENTE SortableImage IGUAL QUE ANTES) ...
 function SortableImage({
   image,
   onDelete,
@@ -144,11 +144,12 @@ function SortableImage({
         />
       </div>
       <div className="product-info">
-        <p className="product-title">Imagen de prueba</p>
+        {/* Mostramos el nombre del archivo si existe, o un texto genérico */}
+        <p className="product-title">{image.name || "Imagen de prueba"}</p>
         <div className="product-pricing">
-          <span className="discount-badge">30%</span>
+          {/* <span className="discount-badge">30%</span>
           <span className="price-current">$ 00.000</span>
-          <span className="price-old">$ 00.000</span>
+          <span className="price-old">$ 00.000</span> */}
         </div>
       </div>
       <button className="delete-image-btn" onClick={handleDeleteClick}>
@@ -186,7 +187,9 @@ function App() {
     try {
       localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(images));
     } catch (e) {
-      alert("Error: Almacenamiento lleno.");
+      console.warn(
+        "El almacenamiento local está lleno. Los cambios no persistirán si recargas la página."
+      );
     }
   }, [images]);
 
@@ -208,6 +211,7 @@ function App() {
     }
   };
 
+  // --- FUNCIÓN ORIGINAL PARA ARCHIVOS SUELTOS (Sin cambios) ---
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
     if (!files) return;
@@ -219,7 +223,11 @@ function App() {
         }
         const reader = new FileReader();
         reader.onload = () =>
-          resolve({ id: crypto.randomUUID(), url: reader.result as string });
+          resolve({
+            id: crypto.randomUUID(),
+            url: reader.result as string,
+            name: file.name,
+          });
         reader.onerror = (error) => reject(error);
         reader.readAsDataURL(file);
       });
@@ -231,6 +239,68 @@ function App() {
       ) as ImageType[];
       setImages((prev) => [...prev, ...validNewImages]);
     });
+    event.target.value = "";
+  };
+
+  // --- NUEVA LÓGICA: SELECCIONAR SOLO 1 IMAGEN POR CARPETA ---
+  const handleFolderRecursiveUpload = (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const files = event.target.files;
+    if (!files) return;
+
+    const imagesByFolder: Record<string, File[]> = {};
+    Array.from(files).forEach((file) => {
+      if (!file.type.startsWith("image/")) return;
+      const fullPath = file.webkitRelativePath;
+      const pathParts = fullPath.split("/");
+      pathParts.pop();
+      const folderPath = pathParts.join("/");
+      if (!imagesByFolder[folderPath]) {
+        imagesByFolder[folderPath] = [];
+      }
+      imagesByFolder[folderPath].push(file);
+    });
+
+    const selectedFiles: File[] = [];
+
+    Object.keys(imagesByFolder).forEach((folder) => {
+      const folderFiles = imagesByFolder[folder];
+
+      folderFiles.sort((a, b) => a.name.localeCompare(b.name));
+      if (folderFiles.length > 0) {
+        selectedFiles.push(folderFiles[0]);
+      }
+    });
+
+    const readFileAsDataURL = (file: File): Promise<ImageType | null> => {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () =>
+          resolve({
+            id: crypto.randomUUID(),
+            url: reader.result as string,
+            name: file.name,
+          });
+        reader.onerror = (error) => reject(error);
+        reader.readAsDataURL(file);
+      });
+    };
+
+    const newImagePromises = selectedFiles.map(readFileAsDataURL);
+
+    Promise.all(newImagePromises).then((newImages) => {
+      const validNewImages = newImages.filter(
+        (img) => img !== null
+      ) as ImageType[];
+      setImages((prev) => [...prev, ...validNewImages]);
+      alert(
+        `Se procesaron ${
+          Object.keys(imagesByFolder).length
+        } carpetas y se cargaron ${validNewImages.length} imágenes.`
+      );
+    });
+
     event.target.value = "";
   };
 
@@ -250,10 +320,8 @@ function App() {
   };
   const handleCancelDelete = () => setImageToDelete(null);
 
-  // --- LOGICA DE EXPORTACIÓN CORREGIDA (LLENADO DE HOJAS) ---
   const handleExportPDF = async () => {
     setIsExporting(true);
-
     const rootElement = document.getElementById("root") as HTMLElement;
     const controls = document.querySelector(".controls") as HTMLElement;
     const deleteBtn = document.querySelector(
@@ -263,19 +331,13 @@ function App() {
       ".delete-image-btn"
     ) as NodeListOf<HTMLElement>;
 
-    // 1. Ocultar UI
     if (controls) controls.style.display = "none";
     if (deleteBtn) deleteBtn.style.display = "none";
     deleteImgBtns.forEach((btn) => (btn.style.display = "none"));
 
-    // 2. Obtener imágenes
     const allImageContainers = Array.from(
       document.querySelectorAll(".sortable-image-container")
     ) as HTMLElement[];
-
-    // 3. Calcular archivos necesarios basados en CAPACIDAD (48 por archivo)
-    // Si tienes 30 items -> 1 archivo.
-    // Si tienes 100 items -> 3 archivos (48, 48, 4).
     const totalFilesNeeded = Math.ceil(
       allImageContainers.length / ITEMS_PER_PDF_FILE
     );
@@ -285,12 +347,9 @@ function App() {
         setExportProgress(
           `Generando Archivo ${i + 1} de ${totalFilesNeeded}...`
         );
-
-        // 4. Rango de este archivo (Ej: 0 a 48)
         const start = i * ITEMS_PER_PDF_FILE;
         const end = start + ITEMS_PER_PDF_FILE;
 
-        // 5. Mostrar SOLO las imágenes de este lote
         allImageContainers.forEach((container, index) => {
           if (index >= start && index < end) {
             container.style.display = "flex";
@@ -298,19 +357,16 @@ function App() {
             container.style.display = "none";
           }
         });
-
-        // 6. Pausa para reflow
         await new Promise((resolve) => setTimeout(resolve, 200));
 
-        // 7. Captura
         const canvas = await html2canvas(rootElement, {
           useCORS: true,
           scale: 2,
           scrollY: -window.scrollY,
           windowWidth: document.documentElement.offsetWidth,
-          // Importante: ignorar elementos con data-html2canvas-ignore (el overlay)
           ignoreElements: (element) =>
             element.hasAttribute("data-html2canvas-ignore"),
+          backgroundColor: "#ffffff",
         });
 
         const imgData = canvas.toDataURL("image/png");
@@ -319,43 +375,32 @@ function App() {
         const pdfHeight = pdf.internal.pageSize.getHeight();
         const canvasWidth = canvas.width;
         const canvasHeight = canvas.height;
-
-        // Calcular altura de la imagen en el PDF
-        const imgHeight = (canvasHeight * pdfWidth) / canvasWidth;
-
+        const ratio = canvasHeight / canvasWidth;
+        const imgHeight = pdfWidth * ratio;
         let heightLeft = imgHeight;
         let position = 0;
 
-        // Primera página
         pdf.addImage(imgData, "PNG", 0, position, pdfWidth, imgHeight);
         heightLeft -= pdfHeight;
-
-        // Páginas siguientes (si el contenido es más largo que una hoja A4)
         while (heightLeft > 0) {
           position = heightLeft - imgHeight;
           pdf.addPage();
           pdf.addImage(imgData, "PNG", 0, position, pdfWidth, imgHeight);
           heightLeft -= pdfHeight;
         }
-
-        // 8. Descargar
         pdf.save(`catalogo_parte_${i + 1}.pdf`);
-
-        // 9. Pausa
         await new Promise((resolve) => setTimeout(resolve, 1000));
       }
     } catch (error) {
       console.error("Error exportando PDF", error);
       alert("Hubo un error generando los PDFs.");
     } finally {
-      // 10. Restaurar
       allImageContainers.forEach(
         (container) => (container.style.display = "flex")
       );
       if (controls) controls.style.display = "flex";
       if (deleteBtn) deleteBtn.style.display = "flex";
       deleteImgBtns.forEach((btn) => (btn.style.display = ""));
-
       setIsExporting(false);
       setExportProgress("");
     }
@@ -365,51 +410,30 @@ function App() {
     setIsExportingExcel(true);
     try {
       const workbook = new Workbook();
-      const worksheet = workbook.addWorksheet("Imagenes");
-      worksheet.getColumn("A").width = 40;
-      const ROW_HEIGHT_POINTS = 150;
+      const worksheet = workbook.addWorksheet("Listado de Imagenes");
+
+      worksheet.getColumn("A").width = 60;
+
+      const headerRow = worksheet.getRow(1);
+      headerRow.getCell(1).value = "NOMBRE DEL ARCHIVO";
+      headerRow.font = { bold: true };
+      headerRow.commit();
 
       for (let i = 0; i < images.length; i++) {
         const image = images[i];
-        let base64Data = "";
-        let extension: "png" | "jpeg" = "png";
 
-        if (image.url.startsWith("data:image")) {
-          base64Data = image.url.split(",")[1];
-          const imageType = image.url.match(/data:image\/(.+);/)?.[1] || "png";
-          extension = imageType === "jpeg" ? "jpeg" : "png";
-        } else {
-          try {
-            const response = await fetch(image.url);
-            const blob = await response.blob();
-            const reader = new FileReader();
-            base64Data = await new Promise((resolve) => {
-              reader.onloadend = () =>
-                resolve((reader.result as string).split(",")[1]);
-              reader.readAsDataURL(blob);
-            });
-          } catch (e) {
-            continue;
-          }
-        }
-        const imageId = workbook.addImage({
-          base64: base64Data,
-          extension: extension,
-        });
-        const row = worksheet.getRow(i + 1);
-        row.height = ROW_HEIGHT_POINTS;
-        worksheet.addImage(imageId, {
-          tl: { col: 0, row: i },
-          ext: { width: 280, height: 200 },
-        });
+        const row = worksheet.getRow(i + 2);
+
+        row.getCell(1).value = image.name || `Imagen sin nombre (${image.id})`;
       }
+
       const buffer = await workbook.xlsx.writeBuffer();
       const blob = new Blob([buffer], {
         type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       });
       const link = document.createElement("a");
       link.href = URL.createObjectURL(blob);
-      link.download = "imagenes.xlsx";
+      link.download = "listado_imagenes.xlsx";
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -434,26 +458,23 @@ function App() {
 
   return (
     <>
-      {/* OVERLAY DE PROGRESO */}
       {isExporting && (
         <div className="export-overlay" data-html2canvas-ignore="true">
           <div className="export-message">
             <div className="spinner"></div>
             <p>{exportProgress}</p>
-            <small>
-              Por favor, permite la descarga de múltiples archivos si el
-              navegador lo pregunta.
-            </small>
+            <small>Por favor, permite la descarga de múltiples archivos.</small>
           </div>
         </div>
       )}
 
+      {/* ... (TOP BAR Y HEADER IGUALES QUE ANTES) ... */}
       <div className="top-bar">
         <span className="top-bar-left">
           NUEVA COLECCIÓN PARA HOMBRE VER AHORA
         </span>
         <span className="top-bar-center">
-          ¡BLACK DAYS! 30%OFF EN TODA LA TIENDA + OFERTAS EXCLUSIVAS ONLINE
+          ¡BLACK DAYS! 30%OFF EN TODA LA TIENDA
         </span>
         <div className="top-bar-right">
           <span>Ayuda</span>
@@ -470,11 +491,6 @@ function App() {
               <a href="#">Nuevo</a>
               <a href="#">Mujer</a>
               <a href="#">Hombre</a>
-              <a href="#">Kids</a>
-              <a href="#">Básicos</a>
-              <a href="#">Topmark</a>
-              <a href="#">Black days</a>
-              <a href="#">Blog</a>
             </nav>
           </div>
           <div className="header-actions">
@@ -512,18 +528,40 @@ function App() {
         <h1 className="main-title">Ropa para hombre</h1>
 
         <div className="controls">
+          {/* INPUTS OCULTOS */}
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileChange}
+            multiple
+            accept="image/*"
+            style={{ display: "none" }}
+          />
+
+          <input
+            type="file"
+            ref={folderInputRef}
+            onChange={handleFolderRecursiveUpload} // CAMBIADO AQUÍ
+            multiple
+            accept="image/*"
+            {...({ webkitdirectory: "" } as any)}
+            style={{ display: "none" }}
+          />
+
           <button className="btn-v" onClick={handleUploadClick}>
             <span className="btn-v_lg">
               <span className="btn-v_sl"></span>
               <span className="btn-v_text">Subir fotos</span>
             </span>
           </button>
+
           <button className="btn-v" onClick={handleFolderUploadClick}>
             <span className="btn-v_lg">
               <span className="btn-v_sl"></span>
               <span className="btn-v_text">Subir Carpeta</span>
             </span>
           </button>
+
           <button className="btn-v" onClick={handleImportJSON}>
             <span
               className="btn-v_lg"
@@ -581,25 +619,6 @@ function App() {
             </span>
           </button>
         </div>
-
-        <input
-          type="file"
-          ref={fileInputRef}
-          onChange={handleFileChange}
-          multiple
-          accept="image/*"
-          style={{ display: "none" }}
-        />
-
-        <input
-          type="file"
-          ref={folderInputRef}
-          onChange={handleFileChange}
-          multiple
-          accept="image/*"
-          {...({ webkitdirectory: "" } as any)}
-          style={{ display: "none" }}
-        />
 
         <DndContext
           sensors={sensors}
