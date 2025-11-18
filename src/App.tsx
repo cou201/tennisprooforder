@@ -30,8 +30,11 @@ type ImageType = {
 };
 
 const LOCAL_STORAGE_KEY = "savedImages";
-// CANTIDAD DE IMÁGENES POR PDF (Lo pediste de 3 en 3)
-const IMAGES_PER_PDF = 3;
+
+// --- CONFIGURACIÓN DE PAGINACIÓN ---
+// Asumimos: 4 columnas x 4 filas = 16 productos por página visualmente.
+// 3 Páginas por archivo PDF = 16 * 3 = 48 productos por archivo.
+const ITEMS_PER_PDF_FILE = 48;
 
 // --- Iconos SVG inline ---
 const SearchIcon = () => (
@@ -168,7 +171,6 @@ function App() {
   });
 
   const [isExporting, setIsExporting] = useState(false);
-  // Estado para mostrar progreso (Ej: "Generando PDF 1 de 10...")
   const [exportProgress, setExportProgress] = useState("");
   const [isExportingExcel, setIsExportingExcel] = useState(false);
   const [imageToDelete, setImageToDelete] = useState<string | null>(null);
@@ -248,7 +250,7 @@ function App() {
   };
   const handleCancelDelete = () => setImageToDelete(null);
 
-  // --- LOGICA DE EXPORTACIÓN POR LOTES (BATCHES) ---
+  // --- LOGICA DE EXPORTACIÓN CORREGIDA (LLENADO DE HOJAS) ---
   const handleExportPDF = async () => {
     setIsExporting(true);
 
@@ -257,34 +259,39 @@ function App() {
     const deleteBtn = document.querySelector(
       ".delete-session-container"
     ) as HTMLElement;
-
-    // 1. Ocultar elementos que no queremos en el PDF
-    if (controls) controls.style.display = "none";
-    if (deleteBtn) deleteBtn.style.display = "none";
     const deleteImgBtns = document.querySelectorAll(
       ".delete-image-btn"
     ) as NodeListOf<HTMLElement>;
+
+    // 1. Ocultar UI
+    if (controls) controls.style.display = "none";
+    if (deleteBtn) deleteBtn.style.display = "none";
     deleteImgBtns.forEach((btn) => (btn.style.display = "none"));
 
-    // 2. Obtener todas las tarjetas de imágenes del DOM
+    // 2. Obtener imágenes
     const allImageContainers = Array.from(
       document.querySelectorAll(".sortable-image-container")
     ) as HTMLElement[];
 
-    // 3. Calcular cuántos PDFs haremos
-    const totalBatches = Math.ceil(allImageContainers.length / IMAGES_PER_PDF);
+    // 3. Calcular archivos necesarios basados en CAPACIDAD (48 por archivo)
+    // Si tienes 30 items -> 1 archivo.
+    // Si tienes 100 items -> 3 archivos (48, 48, 4).
+    const totalFilesNeeded = Math.ceil(
+      allImageContainers.length / ITEMS_PER_PDF_FILE
+    );
 
     try {
-      for (let i = 0; i < totalBatches; i++) {
-        setExportProgress(`Generando PDF ${i + 1} de ${totalBatches}...`);
+      for (let i = 0; i < totalFilesNeeded; i++) {
+        setExportProgress(
+          `Generando Archivo ${i + 1} de ${totalFilesNeeded}...`
+        );
 
-        // 4. Calcular índices de inicio y fin para este lote
-        const start = i * IMAGES_PER_PDF;
-        const end = start + IMAGES_PER_PDF;
+        // 4. Rango de este archivo (Ej: 0 a 48)
+        const start = i * ITEMS_PER_PDF_FILE;
+        const end = start + ITEMS_PER_PDF_FILE;
 
-        // 5. Mostrar SOLO las imágenes de este lote, ocultar las demás
+        // 5. Mostrar SOLO las imágenes de este lote
         allImageContainers.forEach((container, index) => {
-          // Guardar el display original si lo necesitaras, pero flex está bien
           if (index >= start && index < end) {
             container.style.display = "flex";
           } else {
@@ -292,15 +299,18 @@ function App() {
           }
         });
 
-        // 6. Pequeña pausa para que el navegador renderice los cambios (reflow)
-        await new Promise((resolve) => setTimeout(resolve, 100));
+        // 6. Pausa para reflow
+        await new Promise((resolve) => setTimeout(resolve, 200));
 
-        // 7. Capturar el PDF
+        // 7. Captura
         const canvas = await html2canvas(rootElement, {
           useCORS: true,
           scale: 2,
           scrollY: -window.scrollY,
           windowWidth: document.documentElement.offsetWidth,
+          // Importante: ignorar elementos con data-html2canvas-ignore (el overlay)
+          ignoreElements: (element) =>
+            element.hasAttribute("data-html2canvas-ignore"),
         });
 
         const imgData = canvas.toDataURL("image/png");
@@ -309,14 +319,18 @@ function App() {
         const pdfHeight = pdf.internal.pageSize.getHeight();
         const canvasWidth = canvas.width;
         const canvasHeight = canvas.height;
-        const ratio = canvasHeight / canvasWidth;
-        const imgHeight = pdfWidth * ratio;
+
+        // Calcular altura de la imagen en el PDF
+        const imgHeight = (canvasHeight * pdfWidth) / canvasWidth;
 
         let heightLeft = imgHeight;
         let position = 0;
 
+        // Primera página
         pdf.addImage(imgData, "PNG", 0, position, pdfWidth, imgHeight);
         heightLeft -= pdfHeight;
+
+        // Páginas siguientes (si el contenido es más largo que una hoja A4)
         while (heightLeft > 0) {
           position = heightLeft - imgHeight;
           pdf.addPage();
@@ -324,17 +338,17 @@ function App() {
           heightLeft -= pdfHeight;
         }
 
-        // 8. Descargar este archivo específico
+        // 8. Descargar
         pdf.save(`catalogo_parte_${i + 1}.pdf`);
 
-        // 9. Pausa de seguridad para no saturar la memoria del navegador
-        await new Promise((resolve) => setTimeout(resolve, 500));
+        // 9. Pausa
+        await new Promise((resolve) => setTimeout(resolve, 1000));
       }
     } catch (error) {
       console.error("Error exportando PDF", error);
       alert("Hubo un error generando los PDFs.");
     } finally {
-      // 10. Restaurar todo a la normalidad
+      // 10. Restaurar
       allImageContainers.forEach(
         (container) => (container.style.display = "flex")
       );
@@ -420,9 +434,9 @@ function App() {
 
   return (
     <>
-      {/* OVERLAY DE PROGRESO (Se muestra solo cuando se exporta) */}
+      {/* OVERLAY DE PROGRESO */}
       {isExporting && (
-        <div className="export-overlay">
+        <div className="export-overlay" data-html2canvas-ignore="true">
           <div className="export-message">
             <div className="spinner"></div>
             <p>{exportProgress}</p>
@@ -576,6 +590,7 @@ function App() {
           accept="image/*"
           style={{ display: "none" }}
         />
+
         <input
           type="file"
           ref={folderInputRef}
