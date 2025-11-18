@@ -582,7 +582,7 @@ function App() {
           onChange={handleFileChange}
           multiple
           accept="image/*"
-          /* @ts-ignore */ webkitdirectory=""
+          {...({ webkitdirectory: "" } as any)}
           style={{ display: "none" }}
         />
 
