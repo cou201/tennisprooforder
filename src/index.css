@@ -1,0 +1,693 @@
+@import url("https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&display=swap");
+
+#root {
+  font-family: "Lato", Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  color: #000;
+  width: 100%;
+  background-color: #fff;
+}
+
+/* --- TOP BAR (Barra gris superior) --- */
+.top-bar {
+  background-color: #f4f4f4;
+  font-size: 11px;
+  color: #000;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 30px;
+  font-style: italic;
+  width: 100%;
+  box-sizing: border-box;
+  letter-spacing: 0.5px;
+}
+
+.top-bar-center {
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.top-bar-right {
+  display: flex;
+  gap: 15px;
+  font-style: normal;
+  font-size: 10px;
+  text-transform: uppercase;
+}
+
+.separator {
+  color: #ccc;
+}
+
+/* --- MAIN HEADER --- */
+.main-header {
+  width: 100%;
+  background-color: #fff;
+  border-bottom: 1px solid #eee;
+  padding: 15px 0;
+}
+
+.header-content {
+  width: 100%;
+  padding: 0 30px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-sizing: border-box;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 40px;
+}
+
+.logo {
+  height: 30px;
+  width: auto;
+  object-fit: contain;
+  cursor: pointer;
+  filter: grayscale(100%) brightness(0);
+}
+
+/* --- MENU DE NAVEGACION --- */
+.nav-menu {
+  display: flex;
+  gap: 25px;
+}
+
+.nav-menu a {
+  text-decoration: none;
+  color: #000;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  transition: opacity 0.3s ease;
+  font-weight: 400;
+}
+
+.nav-menu a:hover {
+  opacity: 0.6;
+}
+
+/* --- ACCIONES DERECHA --- */
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.search-container {
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid #000;
+  padding-bottom: 2px;
+  margin-right: 10px;
+}
+
+.search-input {
+  border: none;
+  outline: none;
+  font-size: 13px;
+  width: 150px;
+  text-align: right;
+  padding-right: 5px;
+  color: #666;
+}
+
+.icon-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 5px;
+  display: flex;
+  align-items: center;
+  color: #000;
+}
+
+.cart-btn {
+  position: relative;
+}
+
+.cart-badge {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  background-color: #000;
+  color: #fff;
+  font-size: 9px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* --- BANNER Y MAIN --- */
+main {
+  width: 100%;
+}
+
+.banner {
+  display: block;
+  width: 100%;
+  line-height: 0;
+}
+
+.banner-img {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.main-title {
+  margin: 30px 30px;
+  font-size: 2.5rem;
+  color: #000;
+  font-weight: 400;
+  padding: 0;
+  text-align: left;
+}
+
+/* --- CONTROLES --- */
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 15px;
+  margin-left: 30px;
+  margin-bottom: 30px;
+  align-items: center;
+}
+
+/* --- BOTONES ESTILO NUEVO (btn-v) --- */
+.btn-v {
+  -moz-appearance: none;
+  -webkit-appearance: none;
+  appearance: none;
+  border: none;
+  background: none;
+  color: #0f1923;
+  cursor: pointer;
+  position: relative;
+  padding: 8px;
+  margin-bottom: 20px;
+  text-transform: uppercase;
+  font-weight: bold;
+  font-size: 14px;
+  transition: all 0.15s ease;
+}
+
+.btn-v::before,
+.btn-v::after {
+  content: "";
+  display: block;
+  position: absolute;
+  right: 0;
+  left: 0;
+  height: calc(50% - 5px);
+  border: 1px solid #7d8082;
+  transition: all 0.15s ease;
+}
+
+.btn-v::before {
+  top: 0;
+  border-bottom-width: 0;
+}
+
+.btn-v::after {
+  bottom: 0;
+  border-top-width: 0;
+}
+
+.btn-v:active,
+.btn-v:focus {
+  outline: none;
+}
+
+.btn-v:active::before,
+.btn-v:active::after {
+  right: 3px;
+  left: 3px;
+}
+
+.btn-v:active::before {
+  top: 3px;
+}
+
+.btn-v:active::after {
+  bottom: 3px;
+}
+
+.btn-v_lg {
+  position: relative;
+  display: block;
+  padding: 10px 20px;
+  color: #fff;
+  background-color: #0f1923;
+  overflow: hidden;
+  box-shadow: inset 0px 0px 0px 1px transparent;
+}
+
+.btn-v_lg::before {
+  content: "";
+  display: block;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 2px;
+  height: 2px;
+  background-color: #0f1923;
+}
+
+.btn-v_lg::after {
+  content: "";
+  display: block;
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 4px;
+  height: 4px;
+  background-color: #0f1923;
+  transition: all 0.2s ease;
+}
+
+.btn-v_sl {
+  display: block;
+  position: absolute;
+  top: 0;
+  bottom: -1px;
+  left: -8px;
+  width: 0;
+  background-color: #ff4655;
+  transform: skew(-15deg);
+  transition: all 0.2s ease;
+}
+
+.btn-v_text {
+  position: relative;
+}
+
+.btn-v:hover {
+  color: #0f1923;
+}
+
+.btn-v:hover .btn-v_sl {
+  width: calc(100% + 15px);
+}
+
+.btn-v:hover .btn-v_lg::after {
+  background-color: #fff;
+}
+
+/* --- BOTONES EXPORTAR --- */
+.btn-uiverse-dl {
+  position: relative;
+  width: 150px;
+  height: 40px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  border: 1px solid #000;
+  background-color: #000;
+  overflow: hidden;
+  padding: 0;
+  border-radius: 0;
+  margin-bottom: 20px;
+}
+
+.btn-uiverse-dl,
+.btn-uiverse-dl__icon,
+.btn-uiverse-dl__text {
+  transition: all 0.3s;
+}
+
+.btn-uiverse-dl .btn-uiverse-dl__text {
+  transform: translateX(15px);
+  color: #fff;
+  font-weight: 600;
+  width: 100%;
+  text-align: center;
+  padding-right: 39px;
+}
+
+.btn-uiverse-dl .btn-uiverse-dl__icon {
+  position: absolute;
+  transform: translateX(109px);
+  height: 100%;
+  width: 39px;
+  background-color: #17795e;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  right: 0;
+  top: 0;
+}
+
+.btn-uiverse-dl .svg {
+  width: 20px;
+  fill: #fff;
+}
+
+.btn-uiverse-dl:hover {
+  background: #37423f;
+}
+
+.btn-uiverse-dl:hover .btn-uiverse-dl__text {
+  color: transparent;
+}
+
+.btn-uiverse-dl:hover .btn-uiverse-dl__icon {
+  width: 148px;
+  transform: translateX(0);
+  width: 100%;
+  left: 0;
+}
+
+.btn-uiverse-dl:active .btn-uiverse-dl__icon {
+  background-color: #75827e;
+}
+
+.btn-uiverse-dl:active {
+  border: 1px solid #303232;
+}
+
+.btn-uiverse-dl:disabled {
+  background-color: #999;
+  border-color: #777;
+  cursor: not-allowed;
+}
+
+/* --- GRID DE IMÁGENES --- */
+.image-grid {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0;
+  padding-bottom: 50px;
+}
+
+.sortable-image-container {
+  touch-action: none;
+  cursor: grab;
+  display: flex;
+  flex-direction: column;
+  background-color: #fff;
+  position: relative; /* Para el botón absoluto */
+}
+
+.image-wrapper {
+  width: 100%;
+  overflow: hidden;
+}
+
+.grid-image {
+  width: 100%;
+  height: auto;
+  display: block;
+  -webkit-user-drag: none;
+  user-select: none;
+  transition: transform 0.3s ease;
+}
+
+/* --- INFO PRODUCTO --- */
+.product-info {
+  padding: 10px 5px;
+  text-align: left;
+  font-family: "Lato", sans-serif;
+}
+
+.product-title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #000;
+  margin: 0 0 8px 0;
+  line-height: 1.2;
+  text-transform: capitalize;
+}
+
+.product-pricing {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.discount-badge {
+  background-color: #9f0000;
+  color: white;
+  font-size: 0.75rem;
+  font-weight: bold;
+  padding: 2px 4px;
+  border-radius: 0;
+}
+
+.price-current {
+  color: #9f0000;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.price-old {
+  color: #888;
+  text-decoration: line-through;
+  font-size: 0.85rem;
+}
+
+/* --- BOTÓN ELIMINAR IMAGEN (HOVER) --- */
+.delete-image-btn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background-color: rgba(230, 34, 34, 0.85);
+  color: white;
+  border: none;
+  border-radius: 5px;
+  padding: 5px 10px;
+  cursor: pointer;
+  z-index: 10;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  font-size: 12px;
+  font-weight: bold;
+}
+
+.sortable-image-container:hover .delete-image-btn {
+  opacity: 1;
+}
+
+.delete-image-btn:hover {
+  background-color: rgba(255, 54, 54, 1);
+}
+
+/* --- BOTÓN ELIMINAR SESIÓN --- */
+.delete-session-container {
+  display: flex;
+  justify-content: center;
+  padding: 40px 20px;
+}
+
+.noselect {
+  width: 150px;
+  height: 50px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  background: red;
+  border: none;
+  border-radius: 5px;
+  box-shadow: 1px 1px 3px rgba(0, 0, 0, 0.15);
+  background: #e62222;
+}
+
+.noselect,
+.noselect span {
+  transition: 200ms;
+}
+
+.noselect .text {
+  transform: translateX(35px);
+  color: white;
+  font-weight: bold;
+}
+
+.noselect .icon {
+  position: absolute;
+  border-left: 1px solid #c41b1b;
+  transform: translateX(110px);
+  height: 40px;
+  width: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.noselect svg {
+  width: 15px;
+  fill: #eee;
+}
+
+.noselect:hover {
+  background: #ff3636;
+}
+
+.noselect:hover .text {
+  color: transparent;
+}
+
+.noselect:hover .icon {
+  width: 150px;
+  border-left: none;
+  transform: translateX(0);
+}
+
+.noselect:focus {
+  outline: none;
+}
+
+.noselect:active .icon svg {
+  transform: scale(0.8);
+}
+
+/* --- MODAL DE CONFIRMACIÓN --- */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.7);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background-color: white;
+  padding: 30px;
+  border-radius: 8px;
+  text-align: center;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+
+.modal-content p {
+  color: #333;
+  font-size: 1.1rem;
+  margin: 0 0 20px 0;
+}
+
+.modal-buttons {
+  display: flex;
+  gap: 15px;
+  justify-content: center;
+}
+
+.modal-btn {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 5px;
+  font-size: 1rem;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.modal-btn-confirm {
+  background-color: #e62222;
+  color: white;
+}
+.modal-btn-confirm:hover {
+  background-color: #ff3636;
+}
+
+.modal-btn-cancel {
+  background-color: #f0f0f0;
+  color: #333;
+}
+.modal-btn-cancel:hover {
+  background-color: #ddd;
+}
+
+/* --- RESPONSIVE --- */
+@media (max-width: 900px) {
+  .nav-menu {
+    display: none;
+  }
+  .top-bar {
+    flex-direction: column;
+    gap: 5px;
+    text-align: center;
+  }
+}
+
+@media (max-width: 767px) {
+  .controls {
+    flex-direction: column;
+    margin-right: 20px;
+    align-items: flex-start;
+  }
+
+  .image-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0;
+  }
+
+  .product-title {
+    font-size: 0.8rem;
+  }
+
+  .main-title {
+    font-size: 1.8rem;
+  }
+}
+.export-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(255, 255, 255, 0.9);
+  z-index: 9999;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-direction: column;
+}
+
+.export-message {
+  text-align: center;
+  font-size: 1.5rem;
+  color: #000;
+  font-weight: bold;
+}
+
+.export-message small {
+  display: block;
+  font-size: 0.9rem;
+  margin-top: 10px;
+  color: #666;
+  font-weight: normal;
+}
+
+/* Spinner simple */
+.spinner {
+  border: 8px solid #f3f3f3;
+  border-top: 8px solid #000;
+  border-radius: 50%;
+  width: 60px;
+  height: 60px;
+  animation: spin 2s linear infinite;
+  margin: 0 auto 20px auto;
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
