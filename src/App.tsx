@@ -9,10 +9,10 @@ import {
   PointerSensor,
   useSensor,
   useSensors,
-  DragOverlay, // Nuevo import
-  useDraggable, // Nuevo import
-  type UniqueIdentifier, // Nuevo import
-  type DragStartEvent, // Nuevo import
+  DragOverlay,
+  // useDraggable,  <-- BORRA ESTA LÍNEA
+  type UniqueIdentifier,
+  type DragStartEvent,
 } from "@dnd-kit/core";
 import { type DragEndEvent } from "@dnd-kit/core";
 import { restrictToWindowEdges } from "@dnd-kit/modifiers";
