@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 import { Workbook } from "exceljs";
@@ -9,6 +9,10 @@ import {
   PointerSensor,
   useSensor,
   useSensors,
+  DragOverlay, // Nuevo import
+  useDraggable, // Nuevo import
+  type UniqueIdentifier, // Nuevo import
+  type DragStartEvent, // Nuevo import
 } from "@dnd-kit/core";
 import { type DragEndEvent } from "@dnd-kit/core";
 import { restrictToWindowEdges } from "@dnd-kit/modifiers";
@@ -27,15 +31,13 @@ import logoGif from "./arquivos/tennislogo.gif";
 type ImageType = {
   id: string;
   url: string;
-  name?: string; // Opcional: útil para depurar
+  name?: string;
 };
 
 const LOCAL_STORAGE_KEY = "savedImages";
-
-// --- CONFIGURACIÓN DE PAGINACIÓN ---
 const ITEMS_PER_PDF_FILE = 48;
 
-// ... (MANTÉN LOS ICONOS SVG IGUAL QUE ANTES: SearchIcon, LocationIcon, etc.) ...
+// --- ICONOS SVG ---
 const SearchIcon = () => (
   <svg
     width="20"
@@ -97,13 +99,19 @@ const CartIcon = () => (
   </svg>
 );
 
-// ... (MANTÉN EL COMPONENTE SortableImage IGUAL QUE ANTES) ...
+// --- COMPONENTE SortableImage CON CHECKBOX ---
 function SortableImage({
   image,
   onDelete,
+  isSelected,
+  onToggleSelect,
+  isDraggingItem,
 }: {
   image: ImageType;
   onDelete: (id: string) => void;
+  isSelected: boolean;
+  onToggleSelect: (id: string) => void;
+  isDraggingItem: boolean;
 }) {
   const {
     attributes,
@@ -114,7 +122,7 @@ function SortableImage({
     isDragging,
   } = useSortable({ id: image.id });
 
-  const style = {
+  const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
     transition,
     zIndex: isDragging ? 10 : "auto",
@@ -128,14 +136,35 @@ function SortableImage({
     onDelete(image.id);
   };
 
+  // Manejador del Checkbox
+  const handleCheckboxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    e.stopPropagation(); // Evita activar el drag al hacer clic
+    onToggleSelect(image.id);
+  };
+
   return (
     <div
       ref={setNodeRef}
       style={style}
       {...attributes}
       {...listeners}
-      className="sortable-image-container"
+      className={`sortable-image-container ${
+        isSelected ? "selected-image" : ""
+      } ${isDraggingItem ? "dragging-active-item" : ""}`}
     >
+      {/* CHECKBOX AÑADIDO */}
+      <div className="checkbox-container">
+        <input
+          type="checkbox"
+          checked={isSelected}
+          onChange={handleCheckboxChange}
+          // onPointerDown evita que dnd-kit capture el evento en el input
+          onPointerDown={(e) => e.stopPropagation()}
+          className="image-checkbox"
+          data-html2canvas-ignore="true"
+        />
+      </div>
+
       <div className="image-wrapper">
         <img
           src={image.url}
@@ -144,17 +173,90 @@ function SortableImage({
         />
       </div>
       <div className="product-info">
-        {/* Mostramos el nombre del archivo si existe, o un texto genérico */}
         <p className="product-title">{image.name || "Imagen de prueba"}</p>
-        <div className="product-pricing">
-          {/* <span className="discount-badge">30%</span>
-          <span className="price-current">$ 00.000</span>
-          <span className="price-old">$ 00.000</span> */}
-        </div>
+        <div className="product-pricing"></div>
       </div>
-      <button className="delete-image-btn" onClick={handleDeleteClick}>
+      <button
+        className="delete-image-btn"
+        onClick={handleDeleteClick}
+        data-html2canvas-ignore="true"
+      >
         Eliminar Imagen
       </button>
+    </div>
+  );
+}
+
+// --- PREVIEW FLOTANTE PARA ARRASTRE MÚLTIPLE ---
+function DraggableMultipleImages({
+  images,
+  activeId,
+  selectedImages,
+}: {
+  images: ImageType[];
+  activeId: UniqueIdentifier | null;
+  selectedImages: UniqueIdentifier[];
+}) {
+  const itemsToShow =
+    selectedImages.length > 0
+      ? images.filter((img) => selectedImages.includes(img.id))
+      : activeId
+      ? [images.find((img) => img.id === activeId)!]
+      : [];
+
+  if (itemsToShow.length === 0) return null;
+  if (
+    itemsToShow.length === 1 &&
+    itemsToShow[0].id === activeId &&
+    selectedImages.length <= 1
+  )
+    return null;
+
+  return (
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        padding: "10px",
+        background: "rgba(255,255,255,0.9)",
+        border: "2px solid #e62222",
+        borderRadius: "8px",
+        boxShadow: "0 10px 20px rgba(0,0,0,0.3)",
+        width: "180px",
+        pointerEvents: "none",
+      }}
+    >
+      <div
+        style={{
+          fontWeight: "bold",
+          marginBottom: "5px",
+          textAlign: "center",
+          color: "#000",
+        }}
+      >
+        Moviendo {itemsToShow.length} ítems
+      </div>
+      <div
+        style={{
+          display: "flex",
+          gap: "5px",
+          overflow: "hidden",
+          height: "60px",
+        }}
+      >
+        {itemsToShow.slice(0, 3).map((img) => (
+          <img
+            key={img.id}
+            src={img.url}
+            style={{
+              width: "50px",
+              height: "50px",
+              objectFit: "cover",
+              borderRadius: "4px",
+            }}
+          />
+        ))}
+      </div>
     </div>
   );
 }
@@ -176,6 +278,14 @@ function App() {
   const [isExportingExcel, setIsExportingExcel] = useState(false);
   const [imageToDelete, setImageToDelete] = useState<string | null>(null);
 
+  // --- ESTADO PARA SELECCIÓN ---
+  const [selectedImageIds, setSelectedImageIds] = useState<UniqueIdentifier[]>(
+    []
+  );
+  const [activeDragId, setActiveDragId] = useState<UniqueIdentifier | null>(
+    null
+  );
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
 
@@ -192,6 +302,27 @@ function App() {
       );
     }
   }, [images]);
+
+  // --- LOGICA DE SELECCION ---
+  const handleToggleSelect = useCallback((id: UniqueIdentifier) => {
+    setSelectedImageIds((prev) => {
+      if (prev.includes(id)) {
+        return prev.filter((selectedId) => selectedId !== id);
+      } else {
+        return [...prev, id];
+      }
+    });
+  }, []);
+
+  const handleSelectAll = () => {
+    if (selectedImageIds.length === images.length) {
+      setSelectedImageIds([]);
+    } else {
+      setSelectedImageIds(images.map((img) => img.id));
+    }
+  };
+
+  const handleClearSelection = () => setSelectedImageIds([]);
 
   const handleUploadClick = () => fileInputRef.current?.click();
   const handleFolderUploadClick = () => folderInputRef.current?.click();
@@ -211,7 +342,6 @@ function App() {
     }
   };
 
-  // --- FUNCIÓN ORIGINAL PARA ARCHIVOS SUELTOS (Sin cambios) ---
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
     if (!files) return;
@@ -242,13 +372,11 @@ function App() {
     event.target.value = "";
   };
 
-  // --- NUEVA LÓGICA: SELECCIONAR SOLO 1 IMAGEN POR CARPETA ---
   const handleFolderRecursiveUpload = (
     event: React.ChangeEvent<HTMLInputElement>
   ) => {
     const files = event.target.files;
     if (!files) return;
-
     const imagesByFolder: Record<string, File[]> = {};
     Array.from(files).forEach((file) => {
       if (!file.type.startsWith("image/")) return;
@@ -256,23 +384,15 @@ function App() {
       const pathParts = fullPath.split("/");
       pathParts.pop();
       const folderPath = pathParts.join("/");
-      if (!imagesByFolder[folderPath]) {
-        imagesByFolder[folderPath] = [];
-      }
+      if (!imagesByFolder[folderPath]) imagesByFolder[folderPath] = [];
       imagesByFolder[folderPath].push(file);
     });
-
     const selectedFiles: File[] = [];
-
     Object.keys(imagesByFolder).forEach((folder) => {
       const folderFiles = imagesByFolder[folder];
-
       folderFiles.sort((a, b) => a.name.localeCompare(b.name));
-      if (folderFiles.length > 0) {
-        selectedFiles.push(folderFiles[0]);
-      }
+      if (folderFiles.length > 0) selectedFiles.push(folderFiles[0]);
     });
-
     const readFileAsDataURL = (file: File): Promise<ImageType | null> => {
       return new Promise((resolve, reject) => {
         const reader = new FileReader();
@@ -286,9 +406,7 @@ function App() {
         reader.readAsDataURL(file);
       });
     };
-
     const newImagePromises = selectedFiles.map(readFileAsDataURL);
-
     Promise.all(newImagePromises).then((newImages) => {
       const validNewImages = newImages.filter(
         (img) => img !== null
@@ -300,13 +418,13 @@ function App() {
         } carpetas y se cargaron ${validNewImages.length} imágenes.`
       );
     });
-
     event.target.value = "";
   };
 
   const handleDeleteSession = () => {
     if (window.confirm("¿Estás seguro de eliminar TODAS las imágenes?")) {
       setImages([]);
+      setSelectedImageIds([]);
       localStorage.removeItem(LOCAL_STORAGE_KEY);
     }
   };
@@ -315,6 +433,7 @@ function App() {
   const handleConfirmDelete = () => {
     if (imageToDelete) {
       setImages((prev) => prev.filter((img) => img.id !== imageToDelete));
+      setSelectedImageIds((prev) => prev.filter((id) => id !== imageToDelete));
       setImageToDelete(null);
     }
   };
@@ -335,6 +454,12 @@ function App() {
     if (deleteBtn) deleteBtn.style.display = "none";
     deleteImgBtns.forEach((btn) => (btn.style.display = "none"));
 
+    // Ocultar checkboxes temporalmente
+    const checkboxes = document.querySelectorAll(
+      ".checkbox-container"
+    ) as NodeListOf<HTMLElement>;
+    checkboxes.forEach((box) => (box.style.display = "none"));
+
     const allImageContainers = Array.from(
       document.querySelectorAll(".sortable-image-container")
     ) as HTMLElement[];
@@ -349,7 +474,6 @@ function App() {
         );
         const start = i * ITEMS_PER_PDF_FILE;
         const end = start + ITEMS_PER_PDF_FILE;
-
         allImageContainers.forEach((container, index) => {
           if (index >= start && index < end) {
             container.style.display = "flex";
@@ -358,7 +482,6 @@ function App() {
           }
         });
         await new Promise((resolve) => setTimeout(resolve, 200));
-
         const canvas = await html2canvas(rootElement, {
           useCORS: true,
           scale: 2,
@@ -368,18 +491,13 @@ function App() {
             element.hasAttribute("data-html2canvas-ignore"),
           backgroundColor: "#ffffff",
         });
-
         const imgData = canvas.toDataURL("image/png");
         const pdf = new jsPDF("p", "mm", "a4");
         const pdfWidth = pdf.internal.pageSize.getWidth();
         const pdfHeight = pdf.internal.pageSize.getHeight();
-        const canvasWidth = canvas.width;
-        const canvasHeight = canvas.height;
-        const ratio = canvasHeight / canvasWidth;
-        const imgHeight = pdfWidth * ratio;
+        const imgHeight = pdfWidth * (canvas.height / canvas.width);
         let heightLeft = imgHeight;
         let position = 0;
-
         pdf.addImage(imgData, "PNG", 0, position, pdfWidth, imgHeight);
         heightLeft -= pdfHeight;
         while (heightLeft > 0) {
@@ -401,6 +519,7 @@ function App() {
       if (controls) controls.style.display = "flex";
       if (deleteBtn) deleteBtn.style.display = "flex";
       deleteImgBtns.forEach((btn) => (btn.style.display = ""));
+      checkboxes.forEach((box) => (box.style.display = "flex")); // Mostrar checkboxes
       setIsExporting(false);
       setExportProgress("");
     }
@@ -411,22 +530,16 @@ function App() {
     try {
       const workbook = new Workbook();
       const worksheet = workbook.addWorksheet("Listado de Imagenes");
-
       worksheet.getColumn("A").width = 60;
-
       const headerRow = worksheet.getRow(1);
       headerRow.getCell(1).value = "NOMBRE DEL ARCHIVO";
       headerRow.font = { bold: true };
       headerRow.commit();
-
       for (let i = 0; i < images.length; i++) {
         const image = images[i];
-
         const row = worksheet.getRow(i + 2);
-
         row.getCell(1).value = image.name || `Imagen sin nombre (${image.id})`;
       }
-
       const buffer = await workbook.xlsx.writeBuffer();
       const blob = new Blob([buffer], {
         type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -445,13 +558,73 @@ function App() {
     setIsExportingExcel(false);
   };
 
+  // --- LOGICA DE ARRASTRE ---
+  function handleDragStart(event: DragStartEvent) {
+    const { active } = event;
+    setActiveDragId(active.id);
+    // Si arrastramos algo que NO está seleccionado, lo seleccionamos automáticamente (y deseleccionamos el resto si no usas Shift/Ctrl)
+    // En este caso simplificado: Si no está seleccionado, lo añadimos a la selección solo para el drag visual.
+    if (!selectedImageIds.includes(active.id)) {
+      setSelectedImageIds([active.id]);
+    }
+  }
+
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
+    setActiveDragId(null);
+
     if (over && active.id !== over.id) {
-      setImages((items) => {
-        const oldIndex = items.findIndex((item) => item.id === active.id);
-        const newIndex = items.findIndex((item) => item.id === over.id);
-        return arrayMove(items, oldIndex, newIndex);
+      setImages((currentImages) => {
+        const activeIndex = currentImages.findIndex(
+          (item) => item.id === active.id
+        );
+        const overIndex = currentImages.findIndex(
+          (item) => item.id === over.id
+        );
+
+        // Si estamos moviendo un grupo seleccionado
+        if (
+          selectedImageIds.length > 1 &&
+          selectedImageIds.includes(active.id)
+        ) {
+          const itemsToMove = currentImages.filter((img) =>
+            selectedImageIds.includes(img.id)
+          );
+          const itemsRemaining = currentImages.filter(
+            (img) => !selectedImageIds.includes(img.id)
+          );
+
+          // Calculamos dónde insertar.
+          // Encontramos el item sobre el que soltamos en la lista de remanentes (si existe ahí)
+          let insertIndex = itemsRemaining.findIndex(
+            (item) => item.id === over.id
+          );
+
+          // Si soltamos sobre uno de los ítems seleccionados (que visualmente se mueven con nosotros),
+          // intentamos mantener la posición lógica relativa al original start.
+          // Pero para simplificar: si no se encuentra en remaining (porque soltamos sobre uno seleccionado), usamos overIndex ajustado.
+          if (insertIndex === -1) {
+            // Lógica fallback segura: arrayMove simple del activo si algo falla en lógica de grupo
+            return arrayMove(currentImages, activeIndex, overIndex);
+          }
+
+          // Ajuste visual: Si arrastramos hacia abajo, insertamos después.
+          // Esto es complejo calcular perfecto sin refs, pero insertaremos en la posición encontrada.
+          const newOrder = [...itemsRemaining];
+
+          // Si el target (over) estaba originalmente después del source (active), insertamos después
+          // (Esta es una aproximación, dnd-kit maneja índices, aquí reconstruimos el array)
+          if (activeIndex < overIndex) {
+            newOrder.splice(insertIndex + 1, 0, ...itemsToMove);
+          } else {
+            newOrder.splice(insertIndex, 0, ...itemsToMove);
+          }
+
+          return newOrder;
+        }
+
+        // Movimiento simple de 1 elemento
+        return arrayMove(currentImages, activeIndex, overIndex);
       });
     }
   }
@@ -468,7 +641,6 @@ function App() {
         </div>
       )}
 
-      {/* ... (TOP BAR Y HEADER IGUALES QUE ANTES) ... */}
       <div className="top-bar">
         <span className="top-bar-left">
           NUEVA COLECCIÓN PARA HOMBRE VER AHORA
@@ -528,7 +700,6 @@ function App() {
         <h1 className="main-title">Ropa para hombre</h1>
 
         <div className="controls">
-          {/* INPUTS OCULTOS */}
           <input
             type="file"
             ref={fileInputRef}
@@ -537,11 +708,10 @@ function App() {
             accept="image/*"
             style={{ display: "none" }}
           />
-
           <input
             type="file"
             ref={folderInputRef}
-            onChange={handleFolderRecursiveUpload} // CAMBIADO AQUÍ
+            onChange={handleFolderRecursiveUpload}
             multiple
             accept="image/*"
             {...({ webkitdirectory: "" } as any)}
@@ -574,6 +744,40 @@ function App() {
               <span className="btn-v_text">Importar JSON</span>
             </span>
           </button>
+
+          {/* BOTONES DE SELECCIÓN */}
+          {images.length > 0 && (
+            <button className="btn-v" onClick={handleSelectAll}>
+              <span
+                className="btn-v_lg"
+                style={{ background: "#007bff", color: "#fff" }}
+              >
+                <span
+                  className="btn-v_sl"
+                  style={{ background: "#0056b3" }}
+                ></span>
+                <span className="btn-v_text">
+                  {selectedImageIds.length === images.length
+                    ? "Deseleccionar"
+                    : "Seleccionar Todo"}
+                </span>
+              </span>
+            </button>
+          )}
+          {selectedImageIds.length > 0 && (
+            <button className="btn-v" onClick={handleClearSelection}>
+              <span
+                className="btn-v_lg"
+                style={{ background: "#ffc107", color: "#000" }}
+              >
+                <span
+                  className="btn-v_sl"
+                  style={{ background: "#e0a800" }}
+                ></span>
+                <span className="btn-v_text">Limpiar Selección</span>
+              </span>
+            </button>
+          )}
 
           <button
             className="btn-uiverse-dl"
@@ -623,6 +827,7 @@ function App() {
         <DndContext
           sensors={sensors}
           collisionDetection={closestCenter}
+          onDragStart={handleDragStart}
           onDragEnd={handleDragEnd}
           modifiers={[restrictToWindowEdges]}
         >
@@ -633,10 +838,24 @@ function App() {
                   key={image.id}
                   image={image}
                   onDelete={requestDeleteImage}
+                  // Props nuevos
+                  isSelected={selectedImageIds.includes(image.id)}
+                  onToggleSelect={handleToggleSelect}
+                  isDraggingItem={activeDragId === image.id}
                 />
               ))}
             </div>
           </SortableContext>
+          {/* OVERLAY PARA PREVIEW DE MÚLTIPLES */}
+          <DragOverlay>
+            {activeDragId ? (
+              <DraggableMultipleImages
+                images={images}
+                activeId={activeDragId}
+                selectedImages={selectedImageIds}
+              />
+            ) : null}
+          </DragOverlay>
         </DndContext>
 
         {images.length > 0 && (

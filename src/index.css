@@ -694,3 +694,30 @@ main {
     transform: rotate(360deg);
   }
 }
+
+/* --- CHECKBOX Y SELECCIÓN MÚLTIPLE --- */
+.checkbox-container {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 20;
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px;
+}
+
+.image-checkbox {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  accent-color: #e62222;
+}
+
+/* Estilo para cuando una imagen está seleccionada */
+.selected-image {
+  border: 3px solid #e62222; /* Borde rojo visible */
+  background-color: rgba(230, 34, 34, 0.05);
+}
