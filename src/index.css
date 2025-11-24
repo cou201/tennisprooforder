@@ -721,3 +721,64 @@ main {
   border: 3px solid #e62222; /* Borde rojo visible */
   background-color: rgba(230, 34, 34, 0.05);
 }
+
+/* --- LAYOUT SWITCHER --- */
+.layout-toggles {
+  display: flex;
+  gap: 5px;
+  margin-left: auto; /* Esto empuja los botones a la derecha */
+  background: #fff;
+  padding: 5px;
+  border: 1px solid #ddd;
+  border-radius: 5px;
+}
+
+.toggle-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 5px;
+  color: #999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.toggle-btn:hover {
+  background-color: #f0f0f0;
+  color: #333;
+}
+
+.toggle-btn.active {
+  background-color: #000;
+  color: #fff;
+}
+
+/* --- CLASES PARA LA GRILLA DINÁMICA --- */
+/* Sobrescribimos el grid-template-columns por defecto */
+.image-grid.grid-cols-4 {
+  grid-template-columns: repeat(4, 1fr);
+}
+.image-grid.grid-cols-3 {
+  grid-template-columns: repeat(3, 1fr);
+}
+.image-grid.grid-cols-2 {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+/* --- RESPONSIVE --- */
+/* En móvil forzamos 2 columnas sin importar lo que elija el usuario para que no se rompa */
+@media (max-width: 767px) {
+  .image-grid.grid-cols-4,
+  .image-grid.grid-cols-3,
+  .image-grid.grid-cols-2 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  /* Opcional: Ocultar o ajustar los botones de layout en móvil si no tienen sentido */
+  .layout-toggles {
+    display: none;
+  }
+}

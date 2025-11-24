@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import jsPDF from "jspdf";
-import html2canvas from "html2canvas";
+import html2canvas from "html2canvas-pro"; // Asegúrate de que sea html2canvas-pro
 import { Workbook } from "exceljs";
 
 import {
@@ -10,7 +10,6 @@ import {
   useSensor,
   useSensors,
   DragOverlay,
-  // useDraggable,  <-- BORRA ESTA LÍNEA
   type UniqueIdentifier,
   type DragStartEvent,
 } from "@dnd-kit/core";
@@ -99,7 +98,56 @@ const CartIcon = () => (
   </svg>
 );
 
-// --- COMPONENTE SortableImage CON CHECKBOX ---
+// --- ICONOS PARA EL LAYOUT ---
+const IconGrid4 = () => (
+  <svg
+    width="20"
+    height="20"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <rect x="3" y="3" width="7" height="7" />
+    <rect x="14" y="3" width="7" height="7" />
+    <rect x="3" y="14" width="7" height="7" />
+    <rect x="14" y="14" width="7" height="7" />
+  </svg>
+);
+const IconGrid3 = () => (
+  <svg
+    width="20"
+    height="20"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <rect x="3" y="3" width="4" height="18" />
+    <rect x="10" y="3" width="4" height="18" />
+    <rect x="17" y="3" width="4" height="18" />
+  </svg>
+);
+const IconGrid2 = () => (
+  <svg
+    width="20"
+    height="20"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <rect x="4" y="3" width="6" height="18" />
+    <rect x="14" y="3" width="6" height="18" />
+  </svg>
+);
+
 function SortableImage({
   image,
   onDelete,
@@ -136,9 +184,8 @@ function SortableImage({
     onDelete(image.id);
   };
 
-  // Manejador del Checkbox
   const handleCheckboxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    e.stopPropagation(); // Evita activar el drag al hacer clic
+    e.stopPropagation();
     onToggleSelect(image.id);
   };
 
@@ -152,13 +199,11 @@ function SortableImage({
         isSelected ? "selected-image" : ""
       } ${isDraggingItem ? "dragging-active-item" : ""}`}
     >
-      {/* CHECKBOX AÑADIDO */}
       <div className="checkbox-container">
         <input
           type="checkbox"
           checked={isSelected}
           onChange={handleCheckboxChange}
-          // onPointerDown evita que dnd-kit capture el evento en el input
           onPointerDown={(e) => e.stopPropagation()}
           className="image-checkbox"
           data-html2canvas-ignore="true"
@@ -187,7 +232,6 @@ function SortableImage({
   );
 }
 
-// --- PREVIEW FLOTANTE PARA ARRASTRE MÚLTIPLE ---
 function DraggableMultipleImages({
   images,
   activeId,
@@ -273,12 +317,14 @@ function App() {
     return [];
   });
 
+  // --- ESTADO PARA COLUMNAS (4 por defecto) ---
+  const [gridCols, setGridCols] = useState(4);
+
   const [isExporting, setIsExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState("");
   const [isExportingExcel, setIsExportingExcel] = useState(false);
   const [imageToDelete, setImageToDelete] = useState<string | null>(null);
 
-  // --- ESTADO PARA SELECCIÓN ---
   const [selectedImageIds, setSelectedImageIds] = useState<UniqueIdentifier[]>(
     []
   );
@@ -303,7 +349,6 @@ function App() {
     }
   }, [images]);
 
-  // --- LOGICA DE SELECCION ---
   const handleToggleSelect = useCallback((id: UniqueIdentifier) => {
     setSelectedImageIds((prev) => {
       if (prev.includes(id)) {
@@ -454,7 +499,6 @@ function App() {
     if (deleteBtn) deleteBtn.style.display = "none";
     deleteImgBtns.forEach((btn) => (btn.style.display = "none"));
 
-    // Ocultar checkboxes temporalmente
     const checkboxes = document.querySelectorAll(
       ".checkbox-container"
     ) as NodeListOf<HTMLElement>;
@@ -519,7 +563,7 @@ function App() {
       if (controls) controls.style.display = "flex";
       if (deleteBtn) deleteBtn.style.display = "flex";
       deleteImgBtns.forEach((btn) => (btn.style.display = ""));
-      checkboxes.forEach((box) => (box.style.display = "flex")); // Mostrar checkboxes
+      checkboxes.forEach((box) => (box.style.display = "flex"));
       setIsExporting(false);
       setExportProgress("");
     }
@@ -558,12 +602,9 @@ function App() {
     setIsExportingExcel(false);
   };
 
-  // --- LOGICA DE ARRASTRE ---
   function handleDragStart(event: DragStartEvent) {
     const { active } = event;
     setActiveDragId(active.id);
-    // Si arrastramos algo que NO está seleccionado, lo seleccionamos automáticamente (y deseleccionamos el resto si no usas Shift/Ctrl)
-    // En este caso simplificado: Si no está seleccionado, lo añadimos a la selección solo para el drag visual.
     if (!selectedImageIds.includes(active.id)) {
       setSelectedImageIds([active.id]);
     }
@@ -582,7 +623,6 @@ function App() {
           (item) => item.id === over.id
         );
 
-        // Si estamos moviendo un grupo seleccionado
         if (
           selectedImageIds.length > 1 &&
           selectedImageIds.includes(active.id)
@@ -593,37 +633,21 @@ function App() {
           const itemsRemaining = currentImages.filter(
             (img) => !selectedImageIds.includes(img.id)
           );
-
-          // Calculamos dónde insertar.
-          // Encontramos el item sobre el que soltamos en la lista de remanentes (si existe ahí)
           let insertIndex = itemsRemaining.findIndex(
             (item) => item.id === over.id
           );
 
-          // Si soltamos sobre uno de los ítems seleccionados (que visualmente se mueven con nosotros),
-          // intentamos mantener la posición lógica relativa al original start.
-          // Pero para simplificar: si no se encuentra en remaining (porque soltamos sobre uno seleccionado), usamos overIndex ajustado.
           if (insertIndex === -1) {
-            // Lógica fallback segura: arrayMove simple del activo si algo falla en lógica de grupo
             return arrayMove(currentImages, activeIndex, overIndex);
           }
-
-          // Ajuste visual: Si arrastramos hacia abajo, insertamos después.
-          // Esto es complejo calcular perfecto sin refs, pero insertaremos en la posición encontrada.
           const newOrder = [...itemsRemaining];
-
-          // Si el target (over) estaba originalmente después del source (active), insertamos después
-          // (Esta es una aproximación, dnd-kit maneja índices, aquí reconstruimos el array)
           if (activeIndex < overIndex) {
             newOrder.splice(insertIndex + 1, 0, ...itemsToMove);
           } else {
             newOrder.splice(insertIndex, 0, ...itemsToMove);
           }
-
           return newOrder;
         }
-
-        // Movimiento simple de 1 elemento
         return arrayMove(currentImages, activeIndex, overIndex);
       });
     }
@@ -745,7 +769,6 @@ function App() {
             </span>
           </button>
 
-          {/* BOTONES DE SELECCIÓN */}
           {images.length > 0 && (
             <button className="btn-v" onClick={handleSelectAll}>
               <span
@@ -774,7 +797,7 @@ function App() {
                   className="btn-v_sl"
                   style={{ background: "#e0a800" }}
                 ></span>
-                <span className="btn-v_text">Limpiar Selección</span>
+                <span className="btn-v_text">Limpiar</span>
               </span>
             </button>
           )}
@@ -822,6 +845,31 @@ function App() {
               </svg>
             </span>
           </button>
+
+          {/* --- SELECTOR DE LAYOUT A LA DERECHA --- */}
+          <div className="layout-toggles">
+            <button
+              className={`toggle-btn ${gridCols === 2 ? "active" : ""}`}
+              onClick={() => setGridCols(2)}
+              title="2 columnas"
+            >
+              <IconGrid2 />
+            </button>
+            <button
+              className={`toggle-btn ${gridCols === 3 ? "active" : ""}`}
+              onClick={() => setGridCols(3)}
+              title="3 columnas"
+            >
+              <IconGrid3 />
+            </button>
+            <button
+              className={`toggle-btn ${gridCols === 4 ? "active" : ""}`}
+              onClick={() => setGridCols(4)}
+              title="4 columnas"
+            >
+              <IconGrid4 />
+            </button>
+          </div>
         </div>
 
         <DndContext
@@ -831,14 +879,14 @@ function App() {
           onDragEnd={handleDragEnd}
           modifiers={[restrictToWindowEdges]}
         >
+          {/* APLICAMOS LA CLASE DE COLUMNAS DINÁMICA AQUI */}
           <SortableContext items={images} strategy={rectSortingStrategy}>
-            <div className="image-grid">
+            <div className={`image-grid grid-cols-${gridCols}`}>
               {images.map((image) => (
                 <SortableImage
                   key={image.id}
                   image={image}
                   onDelete={requestDeleteImage}
-                  // Props nuevos
                   isSelected={selectedImageIds.includes(image.id)}
                   onToggleSelect={handleToggleSelect}
                   isDraggingItem={activeDragId === image.id}
@@ -846,7 +894,6 @@ function App() {
               ))}
             </div>
           </SortableContext>
-          {/* OVERLAY PARA PREVIEW DE MÚLTIPLES */}
           <DragOverlay>
             {activeDragId ? (
               <DraggableMultipleImages
