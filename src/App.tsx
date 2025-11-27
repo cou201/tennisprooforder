@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import jsPDF from "jspdf";
-import html2canvas from "html2canvas-pro"; // Asegúrate de que sea html2canvas-pro
+import html2canvas from "html2canvas-pro";
 import { Workbook } from "exceljs";
 
 import {
@@ -36,7 +36,6 @@ type ImageType = {
 const LOCAL_STORAGE_KEY = "savedImages";
 const ITEMS_PER_PDF_FILE = 48;
 
-// --- ICONOS SVG ---
 const SearchIcon = () => (
   <svg
     width="20"
@@ -98,7 +97,6 @@ const CartIcon = () => (
   </svg>
 );
 
-// --- ICONOS PARA EL LAYOUT ---
 const IconGrid4 = () => (
   <svg
     width="20"
@@ -148,18 +146,53 @@ const IconGrid2 = () => (
   </svg>
 );
 
+const ZoomInIcon = () => (
+  <svg
+    width="24"
+    height="24"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <circle cx="12" cy="12" r="10"></circle>
+    <line x1="12" y1="8" x2="12" y2="16"></line>
+    <line x1="8" y1="12" x2="16" y2="12"></line>
+  </svg>
+);
+
+const ZoomOutIcon = () => (
+  <svg
+    width="24"
+    height="24"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <circle cx="12" cy="12" r="10"></circle>
+    <line x1="8" y1="12" x2="16" y2="12"></line>
+  </svg>
+);
+
 function SortableImage({
   image,
   onDelete,
   isSelected,
   onToggleSelect,
   isDraggingItem,
+  onClearSelection,
 }: {
   image: ImageType;
   onDelete: (id: string) => void;
   isSelected: boolean;
   onToggleSelect: (id: string) => void;
   isDraggingItem: boolean;
+  onClearSelection: () => void;
 }) {
   const {
     attributes,
@@ -189,6 +222,12 @@ function SortableImage({
     onToggleSelect(image.id);
   };
 
+  const handleClearClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onClearSelection();
+  };
+
   return (
     <div
       ref={setNodeRef}
@@ -209,6 +248,17 @@ function SortableImage({
           data-html2canvas-ignore="true"
         />
       </div>
+
+      {isSelected && (
+        <button
+          className="deselect-all-btn"
+          onClick={handleClearClick}
+          onPointerDown={(e) => e.stopPropagation()}
+          data-html2canvas-ignore="true"
+        >
+          Deseleccionar todo
+        </button>
+      )}
 
       <div className="image-wrapper">
         <img
@@ -317,8 +367,8 @@ function App() {
     return [];
   });
 
-  // --- ESTADO PARA COLUMNAS (4 por defecto) ---
   const [gridCols, setGridCols] = useState(4);
+  const [zoomLevel, setZoomLevel] = useState(1);
 
   const [isExporting, setIsExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState("");
@@ -372,6 +422,14 @@ function App() {
   const handleUploadClick = () => fileInputRef.current?.click();
   const handleFolderUploadClick = () => folderInputRef.current?.click();
 
+  const handleZoomIn = () => {
+    setZoomLevel((prev) => Math.min(prev + 0.1, 3));
+  };
+
+  const handleZoomOut = () => {
+    setZoomLevel((prev) => Math.max(prev - 0.1, 0.3));
+  };
+
   const handleImportJSON = () => {
     const jsonInput = prompt("Pega aquí el JSON generado:");
     if (jsonInput) {
@@ -379,7 +437,7 @@ function App() {
         const parsedImages = JSON.parse(jsonInput);
         if (Array.isArray(parsedImages)) {
           const validImages = parsedImages.filter((img) => img.id && img.url);
-          setImages((prev) => [...prev, ...validImages]);
+          setImages((prev) => [...validImages, ...prev]);
         }
       } catch (e) {
         console.error(e);
@@ -412,7 +470,7 @@ function App() {
       const validNewImages = newImages.filter(
         (img) => img !== null
       ) as ImageType[];
-      setImages((prev) => [...prev, ...validNewImages]);
+      setImages((prev) => [...validNewImages, ...prev]);
     });
     event.target.value = "";
   };
@@ -456,7 +514,7 @@ function App() {
       const validNewImages = newImages.filter(
         (img) => img !== null
       ) as ImageType[];
-      setImages((prev) => [...prev, ...validNewImages]);
+      setImages((prev) => [...validNewImages, ...prev]);
       alert(
         `Se procesaron ${
           Object.keys(imagesByFolder).length
@@ -494,9 +552,13 @@ function App() {
     const deleteImgBtns = document.querySelectorAll(
       ".delete-image-btn"
     ) as NodeListOf<HTMLElement>;
+    const zoomControls = document.querySelector(
+      ".zoom-controls"
+    ) as HTMLElement;
 
     if (controls) controls.style.display = "none";
     if (deleteBtn) deleteBtn.style.display = "none";
+    if (zoomControls) zoomControls.style.display = "none";
     deleteImgBtns.forEach((btn) => (btn.style.display = "none"));
 
     const checkboxes = document.querySelectorAll(
@@ -510,6 +572,16 @@ function App() {
     const totalFilesNeeded = Math.ceil(
       allImageContainers.length / ITEMS_PER_PDF_FILE
     );
+
+    // Guardar estilos originales
+    const originalZoom = rootElement.style.transform;
+    const originalWidth = rootElement.style.width;
+    const originalTransformOrigin = rootElement.style.transformOrigin;
+
+    // Resetear para exportación limpia
+    rootElement.style.transform = "none";
+    rootElement.style.width = "100%";
+    rootElement.style.transformOrigin = "top left";
 
     try {
       for (let i = 0; i < totalFilesNeeded; i++) {
@@ -557,11 +629,17 @@ function App() {
       console.error("Error exportando PDF", error);
       alert("Hubo un error generando los PDFs.");
     } finally {
+      // Restaurar estilos de zoom
+      rootElement.style.transform = originalZoom;
+      rootElement.style.width = originalWidth;
+      rootElement.style.transformOrigin = originalTransformOrigin;
+
       allImageContainers.forEach(
         (container) => (container.style.display = "flex")
       );
       if (controls) controls.style.display = "flex";
       if (deleteBtn) deleteBtn.style.display = "flex";
+      if (zoomControls) zoomControls.style.display = "flex";
       deleteImgBtns.forEach((btn) => (btn.style.display = ""));
       checkboxes.forEach((box) => (box.style.display = "flex"));
       setIsExporting(false);
@@ -665,264 +743,287 @@ function App() {
         </div>
       )}
 
-      <div className="top-bar">
-        <span className="top-bar-left">
-          NUEVA COLECCIÓN PARA HOMBRE VER AHORA
-        </span>
-        <span className="top-bar-center">
-          ¡BLACK DAYS! 30%OFF EN TODA LA TIENDA
-        </span>
-        <div className="top-bar-right">
-          <span>Ayuda</span>
-          <span className="separator">|</span>
-          <span>INICIAR SESIÓN</span>
-        </div>
-      </div>
-
-      <header className="main-header">
-        <div className="header-content">
-          <div className="header-left">
-            <img src={logoGif} alt="Logo" className="logo" />
-            <nav className="nav-menu">
-              <a href="#">Nuevo</a>
-              <a href="#">Mujer</a>
-              <a href="#">Hombre</a>
-            </nav>
+      <div
+        className="app-zoom-wrapper"
+        style={{
+          transform: `scale(${zoomLevel})`,
+          // Lógica Clave: Si el zoom es pequeño (<1), centramos. Si es grande (>=1), alineamos a la izquierda para poder scrollear.
+          transformOrigin: zoomLevel < 1 ? "top center" : "top left",
+          width: "100%",
+          minHeight: "100vh",
+        }}
+      >
+        <div className="top-bar">
+          <span className="top-bar-left">
+            NUEVA COLECCIÓN PARA HOMBRE VER AHORA
+          </span>
+          <span className="top-bar-center">
+            ¡BLACK DAYS! 30%OFF EN TODA LA TIENDA
+          </span>
+          <div className="top-bar-right">
+            <span>Ayuda</span>
+            <span className="separator">|</span>
+            <span>INICIAR SESIÓN</span>
           </div>
-          <div className="header-actions">
-            <div className="search-container">
-              <input
-                type="text"
-                placeholder="Buscar"
-                className="search-input"
-              />
+        </div>
+
+        <header className="main-header">
+          <div className="header-content">
+            <div className="header-left">
+              <img src={logoGif} alt="Logo" className="logo" />
+              <nav className="nav-menu">
+                <a href="#">Nuevo</a>
+                <a href="#">Mujer</a>
+                <a href="#">Hombre</a>
+              </nav>
+            </div>
+            <div className="header-actions">
+              <div className="search-container">
+                <input
+                  type="text"
+                  placeholder="Buscar"
+                  className="search-input"
+                />
+                <button className="icon-btn">
+                  <SearchIcon />
+                </button>
+              </div>
               <button className="icon-btn">
-                <SearchIcon />
+                <LocationIcon />
+              </button>
+              <button className="icon-btn">
+                <BookmarkIcon />
+              </button>
+              <button className="icon-btn cart-btn">
+                <CartIcon />
+                <span className="cart-badge">1</span>
               </button>
             </div>
-            <button className="icon-btn">
-              <LocationIcon />
-            </button>
-            <button className="icon-btn">
-              <BookmarkIcon />
-            </button>
-            <button className="icon-btn cart-btn">
-              <CartIcon />
-              <span className="cart-badge">1</span>
-            </button>
           </div>
-        </div>
-      </header>
+        </header>
 
-      <main>
-        <picture className="banner">
-          <source srcSet={bannerMobile} media="(max-width: 767px)" />
-          <source srcSet={bannerDesk} media="(min-width: 768px)" />
-          <img src={bannerDesk} alt="Banner principal" className="banner-img" />
-        </picture>
+        <main>
+          <picture className="banner">
+            <source srcSet={bannerMobile} media="(max-width: 767px)" />
+            <source srcSet={bannerDesk} media="(min-width: 768px)" />
+            <img
+              src={bannerDesk}
+              alt="Banner principal"
+              className="banner-img"
+            />
+          </picture>
 
-        <h1 className="main-title">Ropa para hombre</h1>
+          <h1 className="main-title">Ropa para hombre</h1>
 
-        <div className="controls">
-          <input
-            type="file"
-            ref={fileInputRef}
-            onChange={handleFileChange}
-            multiple
-            accept="image/*"
-            style={{ display: "none" }}
-          />
-          <input
-            type="file"
-            ref={folderInputRef}
-            onChange={handleFolderRecursiveUpload}
-            multiple
-            accept="image/*"
-            {...({ webkitdirectory: "" } as any)}
-            style={{ display: "none" }}
-          />
+          <div className="controls">
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleFileChange}
+              multiple
+              accept="image/*"
+              style={{ display: "none" }}
+            />
+            <input
+              type="file"
+              ref={folderInputRef}
+              onChange={handleFolderRecursiveUpload}
+              multiple
+              accept="image/*"
+              {...({ webkitdirectory: "" } as any)}
+              style={{ display: "none" }}
+            />
 
-          <button className="btn-v" onClick={handleUploadClick}>
-            <span className="btn-v_lg">
-              <span className="btn-v_sl"></span>
-              <span className="btn-v_text">Subir fotos</span>
-            </span>
-          </button>
+            <button className="btn-v" onClick={handleUploadClick}>
+              <span className="btn-v_lg">
+                <span className="btn-v_sl"></span>
+                <span className="btn-v_text">Subir fotos</span>
+              </span>
+            </button>
 
-          <button className="btn-v" onClick={handleFolderUploadClick}>
-            <span className="btn-v_lg">
-              <span className="btn-v_sl"></span>
-              <span className="btn-v_text">Subir Carpeta</span>
-            </span>
-          </button>
+            <button className="btn-v" onClick={handleFolderUploadClick}>
+              <span className="btn-v_lg">
+                <span className="btn-v_sl"></span>
+                <span className="btn-v_text">Subir Carpeta</span>
+              </span>
+            </button>
 
-          <button className="btn-v" onClick={handleImportJSON}>
-            <span
-              className="btn-v_lg"
-              style={{ background: "#0f1923", color: "#fff" }}
-            >
-              <span
-                className="btn-v_sl"
-                style={{ background: "#ff4655" }}
-              ></span>
-              <span className="btn-v_text">Importar JSON</span>
-            </span>
-          </button>
-
-          {images.length > 0 && (
-            <button className="btn-v" onClick={handleSelectAll}>
+            <button className="btn-v" onClick={handleImportJSON}>
               <span
                 className="btn-v_lg"
-                style={{ background: "#007bff", color: "#fff" }}
+                style={{ background: "#0f1923", color: "#fff" }}
               >
                 <span
                   className="btn-v_sl"
-                  style={{ background: "#0056b3" }}
+                  style={{ background: "#ff4655" }}
                 ></span>
-                <span className="btn-v_text">
-                  {selectedImageIds.length === images.length
-                    ? "Deseleccionar"
-                    : "Seleccionar Todo"}
+                <span className="btn-v_text">Importar JSON</span>
+              </span>
+            </button>
+
+            {images.length > 0 && (
+              <button className="btn-v" onClick={handleSelectAll}>
+                <span
+                  className="btn-v_lg"
+                  style={{ background: "#007bff", color: "#fff" }}
+                >
+                  <span
+                    className="btn-v_sl"
+                    style={{ background: "#0056b3" }}
+                  ></span>
+                  <span className="btn-v_text">
+                    {selectedImageIds.length === images.length
+                      ? "Deseleccionar"
+                      : "Seleccionar Todo"}
+                  </span>
                 </span>
-              </span>
-            </button>
-          )}
-          {selectedImageIds.length > 0 && (
-            <button className="btn-v" onClick={handleClearSelection}>
-              <span
-                className="btn-v_lg"
-                style={{ background: "#ffc107", color: "#000" }}
-              >
+              </button>
+            )}
+            {selectedImageIds.length > 0 && (
+              <button className="btn-v" onClick={handleClearSelection}>
                 <span
-                  className="btn-v_sl"
-                  style={{ background: "#e0a800" }}
-                ></span>
-                <span className="btn-v_text">Limpiar</span>
+                  className="btn-v_lg"
+                  style={{ background: "#ffc107", color: "#000" }}
+                >
+                  <span
+                    className="btn-v_sl"
+                    style={{ background: "#e0a800" }}
+                  ></span>
+                  <span className="btn-v_text">Limpiar</span>
+                </span>
+              </button>
+            )}
+
+            <button
+              className="btn-uiverse-dl"
+              type="button"
+              onClick={handleExportPDF}
+              disabled={isExporting}
+            >
+              <span className="btn-uiverse-dl__text">
+                {isExporting ? "Procesando..." : "Exportar PDF"}
               </span>
-            </button>
-          )}
-
-          <button
-            className="btn-uiverse-dl"
-            type="button"
-            onClick={handleExportPDF}
-            disabled={isExporting}
-          >
-            <span className="btn-uiverse-dl__text">
-              {isExporting ? "Procesando..." : "Exportar PDF"}
-            </span>
-            <span className="btn-uiverse-dl__icon">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 35 35"
-                className="svg"
-              >
-                <path d="M17.5,22.131a1.249,1.249,0,0,1-1.25-1.25V2.187a1.25,1.25,0,0,1,2.5,0V20.881A1.25,1.25,0,0,1,17.5,22.131Z"></path>
-                <path d="M17.5,22.693a3.189,3.189,0,0,1-2.262-.936L8.487,15.006a1.249,1.249,0,0,1,1.767-1.767l6.751,6.751a.7.7,0,0,0,.99,0l6.751-6.751a1.25,1.25,0,0,1,1.768,1.767l-6.752,6.751A3.191,3.191,0,0,1,17.5,22.693Z"></path>
-                <path d="M31.436,34.063H3.564A3.318,3.318,0,0,1,.25,30.749V22.011a1.25,1.25,0,0,1,2.5,0v8.738a.815.815,0,0,0,.814.814H31.436a.815.815,0,0,0,.814-.814V22.011a1.25,1.25,0,1,1,2.5,0v8.738A3.318,3.318,0,0,1,31.436,34.063Z"></path>
-              </svg>
-            </span>
-          </button>
-
-          <button
-            className="btn-uiverse-dl"
-            type="button"
-            onClick={handleExportExcel}
-            disabled={isExportingExcel}
-          >
-            <span className="btn-uiverse-dl__text">
-              {isExportingExcel ? "Generando..." : "Descargar Excel"}
-            </span>
-            <span className="btn-uiverse-dl__icon">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 35 35"
-                className="svg"
-              >
-                <path d="M17.5,22.131a1.249,1.249,0,0,1-1.25-1.25V2.187a1.25,1.25,0,0,1,2.5,0V20.881A1.25,1.25,0,0,1,17.5,22.131Z"></path>
-                <path d="M17.5,22.693a3.189,3.189,0,0,1-2.262-.936L8.487,15.006a1.249,1.249,0,0,1,1.767-1.767l6.751,6.751a.7.7,0,0,0,.99,0l6.751-6.751a1.25,1.25,0,0,1,1.768,1.767l-6.752,6.751A3.191,3.191,0,0,1,17.5,22.693Z"></path>
-                <path d="M31.436,34.063H3.564A3.318,3.318,0,0,1,.25,30.749V22.011a1.25,1.25,0,0,1,2.5,0v8.738a.815.815,0,0,0,.814.814H31.436a.815.815,0,0,0,.814-.814V22.011a1.25,1.25,0,1,1,2.5,0v8.738A3.318,3.318,0,0,1,31.436,34.063Z"></path>
-              </svg>
-            </span>
-          </button>
-
-          {/* --- SELECTOR DE LAYOUT A LA DERECHA --- */}
-          <div className="layout-toggles">
-            <button
-              className={`toggle-btn ${gridCols === 2 ? "active" : ""}`}
-              onClick={() => setGridCols(2)}
-              title="2 columnas"
-            >
-              <IconGrid2 />
-            </button>
-            <button
-              className={`toggle-btn ${gridCols === 3 ? "active" : ""}`}
-              onClick={() => setGridCols(3)}
-              title="3 columnas"
-            >
-              <IconGrid3 />
-            </button>
-            <button
-              className={`toggle-btn ${gridCols === 4 ? "active" : ""}`}
-              onClick={() => setGridCols(4)}
-              title="4 columnas"
-            >
-              <IconGrid4 />
-            </button>
-          </div>
-        </div>
-
-        <DndContext
-          sensors={sensors}
-          collisionDetection={closestCenter}
-          onDragStart={handleDragStart}
-          onDragEnd={handleDragEnd}
-          modifiers={[restrictToWindowEdges]}
-        >
-          {/* APLICAMOS LA CLASE DE COLUMNAS DINÁMICA AQUI */}
-          <SortableContext items={images} strategy={rectSortingStrategy}>
-            <div className={`image-grid grid-cols-${gridCols}`}>
-              {images.map((image) => (
-                <SortableImage
-                  key={image.id}
-                  image={image}
-                  onDelete={requestDeleteImage}
-                  isSelected={selectedImageIds.includes(image.id)}
-                  onToggleSelect={handleToggleSelect}
-                  isDraggingItem={activeDragId === image.id}
-                />
-              ))}
-            </div>
-          </SortableContext>
-          <DragOverlay>
-            {activeDragId ? (
-              <DraggableMultipleImages
-                images={images}
-                activeId={activeDragId}
-                selectedImages={selectedImageIds}
-              />
-            ) : null}
-          </DragOverlay>
-        </DndContext>
-
-        {images.length > 0 && (
-          <div className="delete-session-container">
-            <button className="noselect" onClick={handleDeleteSession}>
-              <span className="text">Delete</span>
-              <span className="icon">
+              <span className="btn-uiverse-dl__icon">
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
-                  width="24"
-                  height="24"
-                  viewBox="0 0 24 24"
+                  viewBox="0 0 35 35"
+                  className="svg"
                 >
-                  <path d="M24 20.188l-8.315-8.209 8.2-8.282-3.697-3.697-8.212 8.318-8.31-8.203-3.666 3.666 8.321 8.24-8.206 8.313 3.666 3.666 8.237-8.318 8.285 8.203z"></path>
+                  <path d="M17.5,22.131a1.249,1.249,0,0,1-1.25-1.25V2.187a1.25,1.25,0,0,1,2.5,0V20.881A1.25,1.25,0,0,1,17.5,22.131Z"></path>
+                  <path d="M17.5,22.693a3.189,3.189,0,0,1-2.262-.936L8.487,15.006a1.249,1.249,0,0,1,1.767-1.767l6.751,6.751a.7.7,0,0,0,.99,0l6.751-6.751a1.25,1.25,0,0,1,1.768,1.767l-6.752,6.751A3.191,3.191,0,0,1,17.5,22.693Z"></path>
+                  <path d="M31.436,34.063H3.564A3.318,3.318,0,0,1,.25,30.749V22.011a1.25,1.25,0,0,1,2.5,0v8.738a.815.815,0,0,0,.814.814H31.436a.815.815,0,0,0,.814-.814V22.011a1.25,1.25,0,1,1,2.5,0v8.738A3.318,3.318,0,0,1,31.436,34.063Z"></path>
                 </svg>
               </span>
             </button>
+
+            <button
+              className="btn-uiverse-dl"
+              type="button"
+              onClick={handleExportExcel}
+              disabled={isExportingExcel}
+            >
+              <span className="btn-uiverse-dl__text">
+                {isExportingExcel ? "Generando..." : "Descargar Excel"}
+              </span>
+              <span className="btn-uiverse-dl__icon">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 35 35"
+                  className="svg"
+                >
+                  <path d="M17.5,22.131a1.249,1.249,0,0,1-1.25-1.25V2.187a1.25,1.25,0,0,1,2.5,0V20.881A1.25,1.25,0,0,1,17.5,22.131Z"></path>
+                  <path d="M17.5,22.693a3.189,3.189,0,0,1-2.262-.936L8.487,15.006a1.249,1.249,0,0,1,1.767-1.767l6.751,6.751a.7.7,0,0,0,.99,0l6.751-6.751a1.25,1.25,0,0,1,1.768,1.767l-6.752,6.751A3.191,3.191,0,0,1,17.5,22.693Z"></path>
+                  <path d="M31.436,34.063H3.564A3.318,3.318,0,0,1,.25,30.749V22.011a1.25,1.25,0,0,1,2.5,0v8.738a.815.815,0,0,0,.814.814H31.436a.815.815,0,0,0,.814-.814V22.011a1.25,1.25,0,1,1,2.5,0v8.738A3.318,3.318,0,0,1,31.436,34.063Z"></path>
+                </svg>
+              </span>
+            </button>
+
+            <div className="layout-toggles">
+              <button
+                className={`toggle-btn ${gridCols === 2 ? "active" : ""}`}
+                onClick={() => setGridCols(2)}
+                title="2 columnas"
+              >
+                <IconGrid2 />
+              </button>
+              <button
+                className={`toggle-btn ${gridCols === 3 ? "active" : ""}`}
+                onClick={() => setGridCols(3)}
+                title="3 columnas"
+              >
+                <IconGrid3 />
+              </button>
+              <button
+                className={`toggle-btn ${gridCols === 4 ? "active" : ""}`}
+                onClick={() => setGridCols(4)}
+                title="4 columnas"
+              >
+                <IconGrid4 />
+              </button>
+            </div>
           </div>
-        )}
-      </main>
+
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragStart={handleDragStart}
+            onDragEnd={handleDragEnd}
+            modifiers={[restrictToWindowEdges]}
+          >
+            <SortableContext items={images} strategy={rectSortingStrategy}>
+              <div className={`image-grid grid-cols-${gridCols}`}>
+                {images.map((image) => (
+                  <SortableImage
+                    key={image.id}
+                    image={image}
+                    onDelete={requestDeleteImage}
+                    isSelected={selectedImageIds.includes(image.id)}
+                    onToggleSelect={handleToggleSelect}
+                    isDraggingItem={activeDragId === image.id}
+                    onClearSelection={handleClearSelection}
+                  />
+                ))}
+              </div>
+            </SortableContext>
+            <DragOverlay>
+              {activeDragId ? (
+                <DraggableMultipleImages
+                  images={images}
+                  activeId={activeDragId}
+                  selectedImages={selectedImageIds}
+                />
+              ) : null}
+            </DragOverlay>
+          </DndContext>
+
+          {images.length > 0 && (
+            <div className="delete-session-container">
+              <button className="noselect" onClick={handleDeleteSession}>
+                <span className="text">Delete</span>
+                <span className="icon">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="24"
+                    height="24"
+                    viewBox="0 0 24 24"
+                  >
+                    <path d="M24 20.188l-8.315-8.209 8.2-8.282-3.697-3.697-8.212 8.318-8.31-8.203-3.666 3.666 8.321 8.24-8.206 8.313 3.666 3.666 8.237-8.318 8.285 8.203z"></path>
+                  </svg>
+                </span>
+              </button>
+            </div>
+          )}
+        </main>
+      </div>
+
+      <div className="zoom-controls">
+        <button className="zoom-btn" onClick={handleZoomIn} title="Acercar">
+          <ZoomInIcon />
+        </button>
+        <button className="zoom-btn" onClick={handleZoomOut} title="Alejar">
+          <ZoomOutIcon />
+        </button>
+      </div>
 
       {imageToDelete && (
         <div className="modal-overlay">
