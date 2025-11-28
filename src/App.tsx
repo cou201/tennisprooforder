@@ -5,13 +5,15 @@ import { Workbook } from "exceljs";
 
 import {
   DndContext,
-  closestCenter,
+  closestCorners, // CAMBIO: Usamos closestCorners para mejor sensibilidad
   PointerSensor,
   useSensor,
   useSensors,
   DragOverlay,
   type UniqueIdentifier,
   type DragStartEvent,
+  type DropAnimation,
+  defaultDropAnimationSideEffects,
 } from "@dnd-kit/core";
 import { type DragEndEvent } from "@dnd-kit/core";
 import { restrictToWindowEdges } from "@dnd-kit/modifiers";
@@ -36,6 +38,17 @@ type ImageType = {
 const LOCAL_STORAGE_KEY = "savedImages";
 const ITEMS_PER_PDF_FILE = 48;
 
+const dropAnimationConfig: DropAnimation = {
+  sideEffects: defaultDropAnimationSideEffects({
+    styles: {
+      active: {
+        opacity: "0.5",
+      },
+    },
+  }),
+};
+
+// --- ICONOS ---
 const SearchIcon = () => (
   <svg
     width="20"
@@ -96,7 +109,6 @@ const CartIcon = () => (
     <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
   </svg>
 );
-
 const IconGrid4 = () => (
   <svg
     width="20"
@@ -145,7 +157,6 @@ const IconGrid2 = () => (
     <rect x="14" y="3" width="6" height="18" />
   </svg>
 );
-
 const ZoomInIcon = () => (
   <svg
     width="24"
@@ -162,7 +173,6 @@ const ZoomInIcon = () => (
     <line x1="8" y1="12" x2="16" y2="12"></line>
   </svg>
 );
-
 const ZoomOutIcon = () => (
   <svg
     width="24"
@@ -186,6 +196,9 @@ function SortableImage({
   onToggleSelect,
   isDraggingItem,
   onClearSelection,
+  zoomLevel,
+  hasSelection,
+  onMoveHere,
 }: {
   image: ImageType;
   onDelete: (id: string) => void;
@@ -193,6 +206,9 @@ function SortableImage({
   onToggleSelect: (id: string) => void;
   isDraggingItem: boolean;
   onClearSelection: () => void;
+  zoomLevel: number;
+  hasSelection: boolean;
+  onMoveHere: (targetId: string) => void;
 }) {
   const {
     attributes,
@@ -204,11 +220,20 @@ function SortableImage({
   } = useSortable({ id: image.id });
 
   const style: React.CSSProperties = {
-    transform: CSS.Transform.toString(transform),
+    transform: CSS.Transform.toString(
+      transform
+        ? {
+            ...transform,
+            x: transform.x / zoomLevel,
+            y: transform.y / zoomLevel,
+          }
+        : null
+    ),
     transition,
     zIndex: isDragging ? 10 : "auto",
-    opacity: isDragging ? 0.8 : 1,
+    opacity: isDragging ? 0.2 : 1,
     touchAction: "none",
+    position: "relative",
   };
 
   const handleDeleteClick = (e: React.MouseEvent) => {
@@ -228,6 +253,15 @@ function SortableImage({
     onClearSelection();
   };
 
+  const handleMoveHereClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onMoveHere(image.id);
+  };
+
+  const checkboxScale = Math.max(1, 1.3 / zoomLevel);
+  const buttonScale = Math.max(1, 1 / zoomLevel);
+
   return (
     <div
       ref={setNodeRef}
@@ -238,6 +272,35 @@ function SortableImage({
         isSelected ? "selected-image" : ""
       } ${isDraggingItem ? "dragging-active-item" : ""}`}
     >
+      {hasSelection && !isSelected && !isDraggingItem && (
+        <button
+          onClick={handleMoveHereClick}
+          onPointerDown={(e) => e.stopPropagation()}
+          data-html2canvas-ignore="true"
+          style={{
+            position: "absolute",
+            top: "50%",
+            left: "50%",
+            transform: `translate(-50%, -50%) scale(${buttonScale})`,
+            zIndex: 20,
+            backgroundColor: "#28a745",
+            color: "white",
+            border: "none",
+            borderRadius: "20px",
+            padding: "8px 16px",
+            cursor: "pointer",
+            fontWeight: "bold",
+            boxShadow: "0 2px 5px rgba(0,0,0,0.3)",
+            display: "flex",
+            alignItems: "center",
+            gap: "5px",
+            whiteSpace: "nowrap",
+          }}
+        >
+          <span>Mover Aquí</span>
+        </button>
+      )}
+
       <div className="checkbox-container">
         <input
           type="checkbox"
@@ -246,6 +309,11 @@ function SortableImage({
           onPointerDown={(e) => e.stopPropagation()}
           className="image-checkbox"
           data-html2canvas-ignore="true"
+          style={{
+            transform: `scale(${checkboxScale})`,
+            transformOrigin: "center center",
+            cursor: "pointer",
+          }}
         />
       </div>
 
@@ -286,10 +354,12 @@ function DraggableMultipleImages({
   images,
   activeId,
   selectedImages,
+  style,
 }: {
   images: ImageType[];
   activeId: UniqueIdentifier | null;
   selectedImages: UniqueIdentifier[];
+  style?: React.CSSProperties;
 }) {
   const itemsToShow =
     selectedImages.length > 0
@@ -299,12 +369,6 @@ function DraggableMultipleImages({
       : [];
 
   if (itemsToShow.length === 0) return null;
-  if (
-    itemsToShow.length === 1 &&
-    itemsToShow[0].id === activeId &&
-    selectedImages.length <= 1
-  )
-    return null;
 
   return (
     <div
@@ -312,12 +376,13 @@ function DraggableMultipleImages({
         display: "flex",
         flexDirection: "column",
         padding: "10px",
-        background: "rgba(255,255,255,0.9)",
+        background: "rgba(255,255,255,0.95)",
         border: "2px solid #e62222",
         borderRadius: "8px",
-        boxShadow: "0 10px 20px rgba(0,0,0,0.3)",
+        boxShadow: "0 15px 30px rgba(0,0,0,0.4)",
         width: "180px",
         pointerEvents: "none",
+        ...style,
       }}
     >
       <div
@@ -326,6 +391,7 @@ function DraggableMultipleImages({
           marginBottom: "5px",
           textAlign: "center",
           color: "#000",
+          fontSize: "14px",
         }}
       >
         Moviendo {itemsToShow.length} ítems
@@ -336,6 +402,7 @@ function DraggableMultipleImages({
           gap: "5px",
           overflow: "hidden",
           height: "60px",
+          justifyContent: "center",
         }}
       >
         {itemsToShow.slice(0, 3).map((img) => (
@@ -347,6 +414,7 @@ function DraggableMultipleImages({
               height: "50px",
               objectFit: "cover",
               borderRadius: "4px",
+              border: "1px solid #ddd",
             }}
           />
         ))}
@@ -361,7 +429,6 @@ function App() {
       const savedImages = localStorage.getItem(LOCAL_STORAGE_KEY);
       if (savedImages) return JSON.parse(savedImages) as ImageType[];
     } catch (e) {
-      console.error("Error localstorage", e);
       localStorage.removeItem(LOCAL_STORAGE_KEY);
     }
     return [];
@@ -369,7 +436,6 @@ function App() {
 
   const [gridCols, setGridCols] = useState(4);
   const [zoomLevel, setZoomLevel] = useState(1);
-
   const [isExporting, setIsExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState("");
   const [isExportingExcel, setIsExportingExcel] = useState(false);
@@ -393,9 +459,7 @@ function App() {
     try {
       localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(images));
     } catch (e) {
-      console.warn(
-        "El almacenamiento local está lleno. Los cambios no persistirán si recargas la página."
-      );
+      console.warn("Local storage full");
     }
   }, [images]);
 
@@ -418,16 +482,32 @@ function App() {
   };
 
   const handleClearSelection = () => setSelectedImageIds([]);
-
   const handleUploadClick = () => fileInputRef.current?.click();
   const handleFolderUploadClick = () => folderInputRef.current?.click();
 
-  const handleZoomIn = () => {
-    setZoomLevel((prev) => Math.min(prev + 0.1, 3));
-  };
+  const handleZoomIn = () => setZoomLevel((prev) => Math.min(prev + 0.1, 2.5));
+  const handleZoomOut = () => setZoomLevel((prev) => Math.max(prev - 0.1, 0.3));
 
-  const handleZoomOut = () => {
-    setZoomLevel((prev) => Math.max(prev - 0.1, 0.3));
+  const handleMoveSelectionTo = (targetId: string) => {
+    setImages((currentImages) => {
+      const itemsToMove = currentImages.filter((img) =>
+        selectedImageIds.includes(img.id)
+      );
+      const remainingImages = currentImages.filter(
+        (img) => !selectedImageIds.includes(img.id)
+      );
+      const targetIndex = remainingImages.findIndex(
+        (img) => img.id === targetId
+      );
+
+      if (targetIndex === -1) return currentImages;
+
+      const newOrder = [...remainingImages];
+      newOrder.splice(targetIndex + 1, 0, ...itemsToMove);
+      return newOrder;
+    });
+    // Si quisieras limpiar la selección después de teletransportar, descomenta:
+    // setSelectedImageIds([]);
   };
 
   const handleImportJSON = () => {
@@ -556,10 +636,15 @@ function App() {
       ".zoom-controls"
     ) as HTMLElement;
 
+    const moveButtons = document.querySelectorAll(
+      "button[data-html2canvas-ignore='true']"
+    );
+
     if (controls) controls.style.display = "none";
     if (deleteBtn) deleteBtn.style.display = "none";
     if (zoomControls) zoomControls.style.display = "none";
     deleteImgBtns.forEach((btn) => (btn.style.display = "none"));
+    moveButtons.forEach((btn) => ((btn as HTMLElement).style.display = "none"));
 
     const checkboxes = document.querySelectorAll(
       ".checkbox-container"
@@ -573,14 +658,10 @@ function App() {
       allImageContainers.length / ITEMS_PER_PDF_FILE
     );
 
-    // Guardar estilos originales
-    const originalZoom = rootElement.style.transform;
-    const originalWidth = rootElement.style.width;
+    const originalTransform = rootElement.style.transform;
     const originalTransformOrigin = rootElement.style.transformOrigin;
 
-    // Resetear para exportación limpia
     rootElement.style.transform = "none";
-    rootElement.style.width = "100%";
     rootElement.style.transformOrigin = "top left";
 
     try {
@@ -629,9 +710,7 @@ function App() {
       console.error("Error exportando PDF", error);
       alert("Hubo un error generando los PDFs.");
     } finally {
-      // Restaurar estilos de zoom
-      rootElement.style.transform = originalZoom;
-      rootElement.style.width = originalWidth;
+      rootElement.style.transform = originalTransform;
       rootElement.style.transformOrigin = originalTransformOrigin;
 
       allImageContainers.forEach(
@@ -641,6 +720,7 @@ function App() {
       if (deleteBtn) deleteBtn.style.display = "flex";
       if (zoomControls) zoomControls.style.display = "flex";
       deleteImgBtns.forEach((btn) => (btn.style.display = ""));
+      moveButtons.forEach((btn) => ((btn as HTMLElement).style.display = ""));
       checkboxes.forEach((box) => (box.style.display = "flex"));
       setIsExporting(false);
       setExportProgress("");
@@ -675,7 +755,6 @@ function App() {
       URL.revokeObjectURL(link.href);
     } catch (err) {
       console.error(err);
-      alert("Error al crear Excel.");
     }
     setIsExportingExcel(false);
   };
@@ -692,6 +771,7 @@ function App() {
     const { active, over } = event;
     setActiveDragId(null);
 
+    // --- REORDENAMIENTO ---
     if (over && active.id !== over.id) {
       setImages((currentImages) => {
         const activeIndex = currentImages.findIndex(
@@ -729,6 +809,13 @@ function App() {
         return arrayMove(currentImages, activeIndex, overIndex);
       });
     }
+
+    // --- CORRECCIÓN DE USABILIDAD: AUTODESELECCIONAR ---
+    // Si la selección es solo de 1 item (el que acabamos de mover),
+    // limpiamos la selección para que no se quede marcada.
+    if (selectedImageIds.length === 1 && selectedImageIds.includes(active.id)) {
+      setSelectedImageIds([]);
+    }
   }
 
   return (
@@ -738,7 +825,6 @@ function App() {
           <div className="export-message">
             <div className="spinner"></div>
             <p>{exportProgress}</p>
-            <small>Por favor, permite la descarga de múltiples archivos.</small>
           </div>
         </div>
       )}
@@ -747,8 +833,7 @@ function App() {
         className="app-zoom-wrapper"
         style={{
           transform: `scale(${zoomLevel})`,
-          // Lógica Clave: Si el zoom es pequeño (<1), centramos. Si es grande (>=1), alineamos a la izquierda para poder scrollear.
-          transformOrigin: zoomLevel < 1 ? "top center" : "top left",
+          transformOrigin: "top left",
           width: "100%",
           minHeight: "100vh",
         }}
@@ -840,14 +925,12 @@ function App() {
                 <span className="btn-v_text">Subir fotos</span>
               </span>
             </button>
-
             <button className="btn-v" onClick={handleFolderUploadClick}>
               <span className="btn-v_lg">
                 <span className="btn-v_sl"></span>
                 <span className="btn-v_text">Subir Carpeta</span>
               </span>
             </button>
-
             <button className="btn-v" onClick={handleImportJSON}>
               <span
                 className="btn-v_lg"
@@ -915,7 +998,6 @@ function App() {
                 </svg>
               </span>
             </button>
-
             <button
               className="btn-uiverse-dl"
               type="button"
@@ -965,7 +1047,8 @@ function App() {
 
           <DndContext
             sensors={sensors}
-            collisionDetection={closestCenter}
+            // CAMBIO: Aquí aplicamos closestCorners para mayor sensibilidad
+            collisionDetection={closestCorners}
             onDragStart={handleDragStart}
             onDragEnd={handleDragEnd}
             modifiers={[restrictToWindowEdges]}
@@ -981,16 +1064,24 @@ function App() {
                     onToggleSelect={handleToggleSelect}
                     isDraggingItem={activeDragId === image.id}
                     onClearSelection={handleClearSelection}
+                    zoomLevel={zoomLevel}
+                    hasSelection={selectedImageIds.length > 0}
+                    onMoveHere={handleMoveSelectionTo}
                   />
                 ))}
               </div>
             </SortableContext>
-            <DragOverlay>
+
+            <DragOverlay dropAnimation={dropAnimationConfig}>
               {activeDragId ? (
                 <DraggableMultipleImages
                   images={images}
                   activeId={activeDragId}
                   selectedImages={selectedImageIds}
+                  style={{
+                    transform: `scale(${zoomLevel})`,
+                    transformOrigin: "top left",
+                  }}
                 />
               ) : null}
             </DragOverlay>
