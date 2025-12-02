@@ -5,7 +5,7 @@ import { Workbook } from "exceljs";
 
 import {
   DndContext,
-  closestCorners, // CAMBIO: Usamos closestCorners para mejor sensibilidad
+  closestCorners,
   PointerSensor,
   useSensor,
   useSensors,
@@ -16,7 +16,7 @@ import {
   defaultDropAnimationSideEffects,
 } from "@dnd-kit/core";
 import { type DragEndEvent } from "@dnd-kit/core";
-import { restrictToWindowEdges } from "@dnd-kit/modifiers";
+import { restrictToWindowEdges, snapCenterToCursor } from "@dnd-kit/modifiers";
 import {
   arrayMove,
   SortableContext,
@@ -48,7 +48,6 @@ const dropAnimationConfig: DropAnimation = {
   }),
 };
 
-// --- ICONOS ---
 const SearchIcon = () => (
   <svg
     width="20"
@@ -186,6 +185,51 @@ const ZoomOutIcon = () => (
   >
     <circle cx="12" cy="12" r="10"></circle>
     <line x1="8" y1="12" x2="16" y2="12"></line>
+  </svg>
+);
+const UndoIcon = () => (
+  <svg
+    width="24"
+    height="24"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M9 14L4 9l5-5" />
+    <path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5v0a5.5 5.5 0 0 1-5.5 5.5H11" />
+  </svg>
+);
+const RedoIcon = () => (
+  <svg
+    width="24"
+    height="24"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M15 14l5-5-5-5" />
+    <path d="M20 9H9.5A5.5 5.5 0 0 0 4 14.5v0A5.5 5.5 0 0 0 9.5 20H13" />
+  </svg>
+);
+const PlusIcon = () => (
+  <svg
+    width="24"
+    height="24"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2.5"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <line x1="12" y1="5" x2="12" y2="19"></line>
+    <line x1="5" y1="12" x2="19" y2="12"></line>
   </svg>
 );
 
@@ -429,10 +473,16 @@ function App() {
       const savedImages = localStorage.getItem(LOCAL_STORAGE_KEY);
       if (savedImages) return JSON.parse(savedImages) as ImageType[];
     } catch (e) {
-      localStorage.removeItem(LOCAL_STORAGE_KEY);
+      console.error(e);
     }
     return [];
   });
+
+  const [past, setPast] = useState<ImageType[][]>([]);
+  const [future, setFuture] = useState<ImageType[][]>([]);
+
+  const ignoreChangeRef = useRef(false);
+  const previousImagesRef = useRef<ImageType[]>(images);
 
   const [gridCols, setGridCols] = useState(4);
   const [zoomLevel, setZoomLevel] = useState(1);
@@ -456,12 +506,52 @@ function App() {
   );
 
   useEffect(() => {
+    const currentImagesJson = JSON.stringify(images);
+    const previousImagesJson = JSON.stringify(previousImagesRef.current);
+
+    if (currentImagesJson !== previousImagesJson) {
+      if (!ignoreChangeRef.current) {
+        const copyOfPrevious = JSON.parse(previousImagesJson);
+        setPast((prev) => [...prev, copyOfPrevious]);
+        setFuture([]);
+      } else {
+        ignoreChangeRef.current = false;
+      }
+      previousImagesRef.current = images;
+    }
+
     try {
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(images));
+      localStorage.setItem(LOCAL_STORAGE_KEY, currentImagesJson);
     } catch (e) {
-      console.warn("Local storage full");
+      console.warn(e);
     }
   }, [images]);
+
+  const handleUndo = () => {
+    if (past.length === 0) return;
+
+    const previousState = past[past.length - 1];
+    const newPast = past.slice(0, -1);
+
+    ignoreChangeRef.current = true;
+
+    setFuture((prev) => [images, ...prev]);
+    setPast(newPast);
+    setImages(previousState);
+  };
+
+  const handleRedo = () => {
+    if (future.length === 0) return;
+
+    const nextState = future[0];
+    const newFuture = future.slice(1);
+
+    ignoreChangeRef.current = true;
+
+    setPast((prev) => [...prev, images]);
+    setFuture(newFuture);
+    setImages(nextState);
+  };
 
   const handleToggleSelect = useCallback((id: UniqueIdentifier) => {
     setSelectedImageIds((prev) => {
@@ -506,8 +596,6 @@ function App() {
       newOrder.splice(targetIndex + 1, 0, ...itemsToMove);
       return newOrder;
     });
-    // Si quisieras limpiar la selección después de teletransportar, descomenta:
-    // setSelectedImageIds([]);
   };
 
   const handleImportJSON = () => {
@@ -608,6 +696,8 @@ function App() {
     if (window.confirm("¿Estás seguro de eliminar TODAS las imágenes?")) {
       setImages([]);
       setSelectedImageIds([]);
+      setPast([]);
+      setFuture([]);
       localStorage.removeItem(LOCAL_STORAGE_KEY);
     }
   };
@@ -707,7 +797,7 @@ function App() {
         await new Promise((resolve) => setTimeout(resolve, 1000));
       }
     } catch (error) {
-      console.error("Error exportando PDF", error);
+      console.error(error);
       alert("Hubo un error generando los PDFs.");
     } finally {
       rootElement.style.transform = originalTransform;
@@ -771,7 +861,6 @@ function App() {
     const { active, over } = event;
     setActiveDragId(null);
 
-    // --- REORDENAMIENTO ---
     if (over && active.id !== over.id) {
       setImages((currentImages) => {
         const activeIndex = currentImages.findIndex(
@@ -810,9 +899,6 @@ function App() {
       });
     }
 
-    // --- CORRECCIÓN DE USABILIDAD: AUTODESELECCIONAR ---
-    // Si la selección es solo de 1 item (el que acabamos de mover),
-    // limpiamos la selección para que no se quede marcada.
     if (selectedImageIds.length === 1 && selectedImageIds.includes(active.id)) {
       setSelectedImageIds([]);
     }
@@ -1047,7 +1133,6 @@ function App() {
 
           <DndContext
             sensors={sensors}
-            // CAMBIO: Aquí aplicamos closestCorners para mayor sensibilidad
             collisionDetection={closestCorners}
             onDragStart={handleDragStart}
             onDragEnd={handleDragEnd}
@@ -1072,7 +1157,10 @@ function App() {
               </div>
             </SortableContext>
 
-            <DragOverlay dropAnimation={dropAnimationConfig}>
+            <DragOverlay
+              dropAnimation={dropAnimationConfig}
+              modifiers={[snapCenterToCursor]}
+            >
               {activeDragId ? (
                 <DraggableMultipleImages
                   images={images}
@@ -1080,7 +1168,6 @@ function App() {
                   selectedImages={selectedImageIds}
                   style={{
                     transform: `scale(${zoomLevel})`,
-                    transformOrigin: "top left",
                   }}
                 />
               ) : null}
@@ -1108,6 +1195,35 @@ function App() {
       </div>
 
       <div className="zoom-controls">
+        <button
+          className="zoom-btn"
+          onClick={handleUploadClick}
+          title="Subir Fotos Rápidamente"
+          style={{ backgroundColor: "#28a745", color: "#fff" }}
+        >
+          <PlusIcon />
+        </button>
+
+        <button
+          className="zoom-btn"
+          onClick={handleRedo}
+          title="Rehacer (Ctrl+Y)"
+          disabled={future.length === 0}
+          style={{ opacity: future.length === 0 ? 0.5 : 1 }}
+        >
+          <RedoIcon />
+        </button>
+
+        <button
+          className="zoom-btn"
+          onClick={handleUndo}
+          title="Deshacer (Ctrl+Z)"
+          disabled={past.length === 0}
+          style={{ opacity: past.length === 0 ? 0.5 : 1 }}
+        >
+          <UndoIcon />
+        </button>
+
         <button className="zoom-btn" onClick={handleZoomIn} title="Acercar">
           <ZoomInIcon />
         </button>
