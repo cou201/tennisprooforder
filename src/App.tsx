@@ -243,6 +243,8 @@ function SortableImage({
   zoomLevel,
   hasSelection,
   onMoveHere,
+  selectedCount,
+  onDeleteSelected,
 }: {
   image: ImageType;
   onDelete: (id: string) => void;
@@ -253,6 +255,8 @@ function SortableImage({
   zoomLevel: number;
   hasSelection: boolean;
   onMoveHere: (targetId: string) => void;
+  selectedCount: number;
+  onDeleteSelected: () => void;
 }) {
   const {
     attributes,
@@ -280,10 +284,23 @@ function SortableImage({
     position: "relative",
   };
 
+  const isBatchDeleteMode = isSelected && selectedCount >= 2;
+
   const handleDeleteClick = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    onDelete(image.id);
+
+    if (isBatchDeleteMode) {
+      if (
+        window.confirm(
+          `¿Estás seguro de borrar el conjunto de ${selectedCount} imágenes?`
+        )
+      ) {
+        onDeleteSelected();
+      }
+    } else {
+      onDelete(image.id);
+    }
   };
 
   const handleCheckboxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -387,8 +404,12 @@ function SortableImage({
         className="delete-image-btn"
         onClick={handleDeleteClick}
         data-html2canvas-ignore="true"
+        style={{
+          backgroundColor: isBatchDeleteMode ? "#dc3545" : undefined,
+          fontWeight: isBatchDeleteMode ? "bold" : "normal",
+        }}
       >
-        Eliminar Imagen
+        {isBatchDeleteMode ? "borrar conjunto de imagenes" : "Eliminar Imagen"}
       </button>
     </div>
   );
@@ -712,6 +733,13 @@ function App() {
   };
   const handleCancelDelete = () => setImageToDelete(null);
 
+  const handleDeleteSelectedSet = () => {
+    setImages((prev) =>
+      prev.filter((img) => !selectedImageIds.includes(img.id))
+    );
+    setSelectedImageIds([]);
+  };
+
   const handleExportPDF = async () => {
     setIsExporting(true);
     const rootElement = document.getElementById("root") as HTMLElement;
@@ -984,7 +1012,7 @@ function App() {
             />
           </picture>
 
-          <h1 className="main-title">Ropa para hombre</h1>
+          <h1 className="main-title"></h1>
 
           <div className="controls">
             <input
@@ -1152,6 +1180,8 @@ function App() {
                     zoomLevel={zoomLevel}
                     hasSelection={selectedImageIds.length > 0}
                     onMoveHere={handleMoveSelectionTo}
+                    selectedCount={selectedImageIds.length}
+                    onDeleteSelected={handleDeleteSelectedSet}
                   />
                 ))}
               </div>
