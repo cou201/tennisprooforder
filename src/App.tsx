@@ -29,13 +29,67 @@ import bannerMobile from "./arquivos/bannermobile.png";
 import bannerDesk from "./arquivos/bannerdesk.png";
 import logoGif from "./arquivos/tennislogo.gif";
 
+const DB_NAME = "ImageCatalogDB";
+const STORE_NAME = "sessionData";
+const DB_VERSION = 1;
+
+const initDB = (): Promise<IDBDatabase> => {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(DB_NAME, DB_VERSION);
+    request.onupgradeneeded = (event) => {
+      const db = (event.target as IDBOpenDBRequest).result;
+      if (!db.objectStoreNames.contains(STORE_NAME)) {
+        db.createObjectStore(STORE_NAME);
+      }
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+};
+
+const saveToDB = async (key: string, data: any) => {
+  const db = await initDB();
+  return new Promise<void>((resolve, reject) => {
+    const transaction = db.transaction(STORE_NAME, "readwrite");
+    const store = transaction.objectStore(STORE_NAME);
+    const request = store.put(data, key);
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+  });
+};
+
+const getFromDB = async (key: string): Promise<any> => {
+  const db = await initDB();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(STORE_NAME, "readonly");
+    const store = transaction.objectStore(STORE_NAME);
+    const request = store.get(key);
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+};
+
+const clearDBKey = async (key: string) => {
+  const db = await initDB();
+  return new Promise<void>((resolve, reject) => {
+    const transaction = db.transaction(STORE_NAME, "readwrite");
+    const store = transaction.objectStore(STORE_NAME);
+    const request = store.delete(key);
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+  });
+};
+// -----------------------------------------------------------
+
 type ImageType = {
   id: string;
   url: string;
   name?: string;
 };
 
-const LOCAL_STORAGE_KEY = "savedImages";
+// IMPORTANTE: Mantener la clave antigua para poder rescatar los datos
+const LOCAL_STORAGE_KEY_OLD = "savedImages";
+const DB_KEY = "savedImages_v2";
 const ITEMS_PER_PDF_FILE = 48;
 
 const dropAnimationConfig: DropAnimation = {
@@ -48,6 +102,7 @@ const dropAnimationConfig: DropAnimation = {
   }),
 };
 
+// ... ÍCONOS ...
 const SearchIcon = () => (
   <svg
     width="20"
@@ -232,7 +287,6 @@ const PlusIcon = () => (
     <line x1="5" y1="12" x2="19" y2="12"></line>
   </svg>
 );
-
 const CheckIcon = () => (
   <svg
     width="24"
@@ -504,21 +558,14 @@ function DraggableMultipleImages({
 }
 
 function App() {
-  const [images, setImages] = useState<ImageType[]>(() => {
-    try {
-      const savedImages = localStorage.getItem(LOCAL_STORAGE_KEY);
-      if (savedImages) return JSON.parse(savedImages) as ImageType[];
-    } catch (e) {
-      console.error(e);
-    }
-    return [];
-  });
+  const [images, setImages] = useState<ImageType[]>([]);
+  const [isLoaded, setIsLoaded] = useState(false);
 
   const [past, setPast] = useState<ImageType[][]>([]);
   const [future, setFuture] = useState<ImageType[][]>([]);
 
   const ignoreChangeRef = useRef(false);
-  const previousImagesRef = useRef<ImageType[]>(images);
+  const previousImagesRef = useRef<ImageType[]>([]);
 
   const [gridCols, setGridCols] = useState(4);
   const [zoomLevel, setZoomLevel] = useState(1);
@@ -542,6 +589,46 @@ function App() {
     useSensor(PointerSensor, { activationConstraint: { distance: 10 } })
   );
 
+  // 1. CARGA INTELIGENTE + MIGRACIÓN DE DATOS (RESCATE DE VERCEL)
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        // A) Intentar cargar desde la base de datos nueva
+        const dbData = await getFromDB(DB_KEY);
+
+        if (dbData && Array.isArray(dbData) && dbData.length > 0) {
+          // Si ya hay datos en la base nueva, usarlos
+          setImages(dbData);
+          previousImagesRef.current = dbData;
+        } else {
+          // B) Si la base nueva está vacía, BUSCAR EN EL LOCALSTORAGE (Donde están tus datos ahora)
+          const localData = localStorage.getItem(LOCAL_STORAGE_KEY_OLD);
+          if (localData) {
+            try {
+              const parsedData = JSON.parse(localData);
+              if (Array.isArray(parsedData) && parsedData.length > 0) {
+                // ¡Datos encontrados! Migrarlos a la base nueva
+                console.log("Rescatando datos antiguos de localStorage...");
+                setImages(parsedData);
+                previousImagesRef.current = parsedData;
+                // Guardar inmediatamente en la base ilimitada
+                await saveToDB(DB_KEY, parsedData);
+              }
+            } catch (e) {
+              console.error("Error leyendo datos antiguos:", e);
+            }
+          }
+        }
+      } catch (err) {
+        console.error("Error inicializando:", err);
+      } finally {
+        setIsLoaded(true);
+      }
+    };
+    loadData();
+  }, []);
+
+  // 2. PROTECCIÓN DE SALIDA
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       if (images.length > 0) {
@@ -550,15 +637,16 @@ function App() {
         return "";
       }
     };
-
     window.addEventListener("beforeunload", handleBeforeUnload);
-
     return () => {
       window.removeEventListener("beforeunload", handleBeforeUnload);
     };
   }, [images]);
 
+  // 3. HISTORIAL (UNDO/REDO)
   useEffect(() => {
+    if (!isLoaded) return;
+
     const currentImagesJson = JSON.stringify(images);
     const previousImagesJson = JSON.stringify(previousImagesRef.current);
 
@@ -572,28 +660,34 @@ function App() {
       }
       previousImagesRef.current = images;
     }
-  }, [images]);
+  }, [images, isLoaded]);
 
+  // 4. AUTO-GUARDADO ASÍNCRONO EN INDEXEDDB (ILIMITADO)
   useEffect(() => {
-    try {
-      const currentImagesJson = JSON.stringify(images);
-      localStorage.setItem(LOCAL_STORAGE_KEY, currentImagesJson);
-    } catch (e) {
-      console.warn(e);
-    }
-  }, [images]);
+    if (!isLoaded) return;
+    saveToDB(DB_KEY, images).catch((err) =>
+      console.error("Error auto-guardado", err)
+    );
+  }, [images, isLoaded]);
 
-  const handleManualSave = () => {
+  const handleManualSave = async () => {
     try {
-      const currentImagesJson = JSON.stringify(images);
-      localStorage.setItem(LOCAL_STORAGE_KEY, currentImagesJson);
+      await saveToDB(DB_KEY, images);
       setShowSaveMessage(true);
       setTimeout(() => {
         setShowSaveMessage(false);
       }, 2000);
     } catch (e) {
       console.error("Error al guardar manualmente:", e);
+      alert("Error al guardar. Verifica si tienes espacio en disco.");
     }
+  };
+
+  const handleExportJSON = () => {
+    const json = JSON.stringify(images);
+    navigator.clipboard.writeText(json).then(() => {
+      alert("¡Datos copiados al portapapeles! Úsalo como respaldo.");
+    });
   };
 
   const handleUndo = () => {
@@ -761,13 +855,15 @@ function App() {
     event.target.value = "";
   };
 
-  const handleDeleteSession = () => {
+  const handleDeleteSession = async () => {
     if (window.confirm("¿Estás seguro de eliminar TODAS las imágenes?")) {
       setImages([]);
       setSelectedImageIds([]);
       setPast([]);
       setFuture([]);
-      localStorage.removeItem(LOCAL_STORAGE_KEY);
+      // Limpiamos de la base de datos y también del localStorage viejo por si acaso
+      await clearDBKey(DB_KEY);
+      localStorage.removeItem(LOCAL_STORAGE_KEY_OLD);
     }
   };
 
@@ -1019,6 +1115,7 @@ function App() {
           transformOrigin: "top left",
           width: "100%",
           minHeight: "100vh",
+          display: isLoaded ? "block" : "none",
         }}
       >
         <div className="top-bar">
@@ -1124,6 +1221,20 @@ function App() {
                   style={{ background: "#ff4655" }}
                 ></span>
                 <span className="btn-v_text">Importar JSON</span>
+              </span>
+            </button>
+
+            {/* Nuevo botón de respaldo manual por seguridad */}
+            <button className="btn-v" onClick={handleExportJSON}>
+              <span
+                className="btn-v_lg"
+                style={{ background: "#6f42c1", color: "#fff" }}
+              >
+                <span
+                  className="btn-v_sl"
+                  style={{ background: "#5a32a3" }}
+                ></span>
+                <span className="btn-v_text">Copiar Respaldo</span>
               </span>
             </button>
 
