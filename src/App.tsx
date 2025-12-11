@@ -233,6 +233,21 @@ const PlusIcon = () => (
   </svg>
 );
 
+const CheckIcon = () => (
+  <svg
+    width="24"
+    height="24"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2.5"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <polyline points="20 6 9 17 4 12"></polyline>
+  </svg>
+);
+
 function SortableImage({
   image,
   onDelete,
@@ -518,6 +533,7 @@ function App() {
   const [activeDragId, setActiveDragId] = useState<UniqueIdentifier | null>(
     null
   );
+  const [showSaveMessage, setShowSaveMessage] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
@@ -525,6 +541,22 @@ function App() {
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 10 } })
   );
+
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (images.length > 0) {
+        e.preventDefault();
+        e.returnValue = "";
+        return "";
+      }
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
+  }, [images]);
 
   useEffect(() => {
     const currentImagesJson = JSON.stringify(images);
@@ -540,13 +572,29 @@ function App() {
       }
       previousImagesRef.current = images;
     }
+  }, [images]);
 
+  useEffect(() => {
     try {
+      const currentImagesJson = JSON.stringify(images);
       localStorage.setItem(LOCAL_STORAGE_KEY, currentImagesJson);
     } catch (e) {
       console.warn(e);
     }
   }, [images]);
+
+  const handleManualSave = () => {
+    try {
+      const currentImagesJson = JSON.stringify(images);
+      localStorage.setItem(LOCAL_STORAGE_KEY, currentImagesJson);
+      setShowSaveMessage(true);
+      setTimeout(() => {
+        setShowSaveMessage(false);
+      }, 2000);
+    } catch (e) {
+      console.error("Error al guardar manualmente:", e);
+    }
+  };
 
   const handleUndo = () => {
     if (past.length === 0) return;
@@ -943,6 +991,27 @@ function App() {
         </div>
       )}
 
+      {showSaveMessage && (
+        <div
+          style={{
+            position: "fixed",
+            bottom: "30px",
+            left: "50%",
+            transform: "translateX(-50%)",
+            backgroundColor: "#28a745",
+            color: "white",
+            padding: "10px 20px",
+            borderRadius: "5px",
+            zIndex: 9999,
+            fontWeight: "bold",
+            boxShadow: "0 4px 6px rgba(0,0,0,0.1)",
+            pointerEvents: "none",
+          }}
+        >
+          progreso actual guardado
+        </div>
+      )}
+
       <div
         className="app-zoom-wrapper"
         style={{
@@ -1259,6 +1328,15 @@ function App() {
         </button>
         <button className="zoom-btn" onClick={handleZoomOut} title="Alejar">
           <ZoomOutIcon />
+        </button>
+
+        <button
+          className="zoom-btn"
+          onClick={handleManualSave}
+          title="Guardar Progreso Manualmente"
+          style={{ backgroundColor: "#007bff", color: "#fff" }}
+        >
+          <CheckIcon />
         </button>
       </div>
 
