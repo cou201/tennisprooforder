@@ -597,21 +597,18 @@ function App() {
         const dbData = await getFromDB(DB_KEY);
 
         if (dbData && Array.isArray(dbData) && dbData.length > 0) {
-          // Si ya hay datos en la base nueva, usarlos
           setImages(dbData);
           previousImagesRef.current = dbData;
         } else {
-          // B) Si la base nueva está vacía, BUSCAR EN EL LOCALSTORAGE (Donde están tus datos ahora)
           const localData = localStorage.getItem(LOCAL_STORAGE_KEY_OLD);
           if (localData) {
             try {
               const parsedData = JSON.parse(localData);
               if (Array.isArray(parsedData) && parsedData.length > 0) {
-                // ¡Datos encontrados! Migrarlos a la base nueva
                 console.log("Rescatando datos antiguos de localStorage...");
                 setImages(parsedData);
                 previousImagesRef.current = parsedData;
-                // Guardar inmediatamente en la base ilimitada
+
                 await saveToDB(DB_KEY, parsedData);
               }
             } catch (e) {
@@ -765,13 +762,26 @@ function App() {
     const jsonInput = prompt("Pega aquí el JSON generado:");
     if (jsonInput) {
       try {
-        const parsedImages = JSON.parse(jsonInput);
-        if (Array.isArray(parsedImages)) {
-          const validImages = parsedImages.filter((img) => img.id && img.url);
-          setImages((prev) => [...validImages, ...prev]);
+        const parsedData = JSON.parse(jsonInput);
+
+        if (Array.isArray(parsedData)) {
+          const newImages: ImageType[] = parsedData.map((item: any) => ({
+            id: crypto.randomUUID(),
+            url: item.image || item.url,
+            name: item.ref || item.name || "Sin Referencia",
+          }));
+          const validImages = newImages.filter((img) => img.url);
+
+          if (validImages.length > 0) {
+            setImages((prev) => [...validImages, ...prev]);
+            alert(`¡Listo! Se importaron ${validImages.length} imágenes.`);
+          } else {
+            alert("No se encontraron imágenes válidas en el texto pegado.");
+          }
         }
       } catch (e) {
         console.error(e);
+        alert("El texto pegado no es un JSON válido o está incompleto.");
       }
     }
   };
