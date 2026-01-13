@@ -821,3 +821,317 @@ main {
 .zoom-btn:active {
   transform: scale(0.95);
 }
+/* --- ESTILOS MENÚ FLOTANTE --- */
+
+/* El contenedor principal de los botones flotantes */
+.zoom-controls {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  z-index: 999;
+  align-items: center;
+}
+
+/* El contenedor de los items que se ocultan/muestran */
+.floating-menu-items {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  opacity: 0;
+  transform: translateY(20px);
+  pointer-events: none; /* Evita clicks cuando está oculto */
+  transition: opacity 0.3s ease, transform 0.3s ease;
+  margin-bottom: 5px; /* Espacio antes del botón del ojo */
+}
+
+/* Estado abierto */
+.floating-menu-items.open {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+/* Estilo específico para el botón del ojo si quieres diferenciarlo */
+.toggle-menu-btn {
+  width: 50px;
+  height: 50px;
+  /* El resto de estilos se heredan de .zoom-btn */
+}
+
+/* --- ESTILOS MODAL EXPORTAR (POPUP) --- */
+
+.export-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.8);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 10000;
+  backdrop-filter: blur(5px);
+}
+
+.export-modal-content {
+  background-color: #fff;
+  width: 1000px;
+  height: 500px;
+  max-width: 90%;
+  max-height: 90vh;
+  border-radius: 12px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+  display: flex;
+  overflow: hidden;
+  padding: 40px;
+  gap: 40px;
+  animation: fadeInModal 0.3s ease-out;
+}
+
+@keyframes fadeInModal {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.export-option-card {
+  flex: 1;
+  background-color: #f9f9f9;
+  border: 2px solid #eee;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  padding: 20px;
+  text-align: center;
+}
+
+.export-option-card:hover {
+  border-color: #000;
+  background-color: #fff;
+  transform: translateY(-5px);
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+}
+
+.export-icon {
+  margin-bottom: 20px;
+  transform: scale(1.5);
+  transition: transform 0.3s;
+}
+
+.export-option-card:hover .export-icon {
+  transform: scale(1.7);
+}
+
+.export-option-card h3 {
+  font-size: 1.5rem;
+  margin: 0 0 10px 0;
+  color: #000;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+
+.export-option-card p {
+  color: #666;
+  font-size: 1rem;
+  max-width: 80%;
+  margin: 0;
+}
+
+/* Responsive para el modal en móviles */
+@media (max-width: 768px) {
+  .export-modal-content {
+    flex-direction: column;
+    height: auto;
+    padding: 20px;
+  }
+
+  .export-option-card {
+    padding: 30px 10px;
+  }
+}
+/* --- ESTILOS INTERNOS DEL MODAL DE OPCIONES --- */
+
+.modal-sub-view {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.modal-header-nav {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid #eee;
+  padding-bottom: 10px;
+}
+
+.modal-header-nav h2 {
+  margin: 0;
+  font-size: 1.5rem;
+  color: #0f1923;
+  text-transform: uppercase;
+}
+
+.back-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 5px;
+  border-radius: 50%;
+  transition: background 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.back-btn:hover {
+  background-color: #f0f0f0;
+}
+
+/* --- FORMULARIO GUARDAR --- */
+.save-form {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  height: 100%;
+  gap: 20px;
+}
+
+.save-form p {
+  font-size: 1.1rem;
+  color: #666;
+  text-align: center;
+}
+
+.layout-name-input {
+  width: 80%;
+  padding: 15px;
+  font-size: 1.2rem;
+  border: 2px solid #ddd;
+  border-radius: 8px;
+  outline: none;
+  transition: border-color 0.3s;
+}
+
+.layout-name-input:focus {
+  border-color: #007bff;
+}
+
+/* --- LISTA DE HISTORIAL --- */
+.history-list-container {
+  flex: 1;
+  overflow-y: auto;
+  border: 1px solid #eee;
+  border-radius: 8px;
+  padding: 10px;
+  background-color: #f9f9f9;
+  margin-bottom: 20px;
+}
+
+.history-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px;
+  background: #fff;
+  border-bottom: 1px solid #eee;
+  cursor: pointer;
+  transition: all 0.2s;
+  border-radius: 4px;
+  margin-bottom: 5px;
+}
+
+.history-item:hover {
+  background-color: #f0f4ff;
+}
+
+.history-item.active {
+  background-color: #e6f0ff;
+  border-left: 4px solid #007bff;
+}
+
+.history-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.history-name {
+  font-weight: bold;
+  font-size: 1.1rem;
+  color: #333;
+}
+
+.history-date {
+  font-size: 0.85rem;
+  color: #888;
+}
+
+.history-count {
+  font-size: 0.8rem;
+  color: #007bff;
+  font-weight: bold;
+  margin-top: 2px;
+}
+
+/* Checkbox personalizado (Radio style) */
+.custom-radio {
+  width: 20px;
+  height: 20px;
+  border: 2px solid #ccc;
+  border-radius: 50%;
+  position: relative;
+}
+
+.custom-radio.checked {
+  border-color: #28a745;
+}
+
+.custom-radio.checked::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 10px;
+  height: 10px;
+  background-color: #28a745;
+  border-radius: 50%;
+}
+
+.load-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-top: 1px solid #eee;
+  padding-top: 15px;
+}
+
+.btn-simple-upload {
+  background: none;
+  border: 1px dashed #999;
+  padding: 10px 15px;
+  color: #666;
+  cursor: pointer;
+  border-radius: 5px;
+  font-size: 0.9rem;
+}
+
+.btn-simple-upload:hover {
+  border-color: #000;
+  color: #000;
+}

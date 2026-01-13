@@ -79,7 +79,6 @@ const clearDBKey = async (key: string) => {
     request.onerror = () => reject(request.error);
   });
 };
-// -----------------------------------------------------------
 
 type ImageType = {
   id: string;
@@ -87,9 +86,18 @@ type ImageType = {
   name?: string;
 };
 
-// IMPORTANTE: Mantener la clave antigua para poder rescatar los datos
+type SavedLayout = {
+  id: string;
+  name: string;
+  date: string;
+  timestamp: number;
+  images: ImageType[];
+  fileRef?: File;
+};
+
 const LOCAL_STORAGE_KEY_OLD = "savedImages";
 const DB_KEY = "savedImages_v2";
+const HISTORY_KEY = "layouts_history_v1";
 const ITEMS_PER_PDF_FILE = 48;
 
 const dropAnimationConfig: DropAnimation = {
@@ -102,7 +110,6 @@ const dropAnimationConfig: DropAnimation = {
   }),
 };
 
-// ... ÍCONOS ...
 const SearchIcon = () => (
   <svg
     width="20"
@@ -301,6 +308,118 @@ const CheckIcon = () => (
     <polyline points="20 6 9 17 4 12"></polyline>
   </svg>
 );
+const EyeOpenIcon = () => (
+  <svg
+    width="24"
+    height="24"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+    <circle cx="12" cy="12" r="3"></circle>
+  </svg>
+);
+const EyeClosedIcon = () => (
+  <svg
+    width="24"
+    height="24"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+    <line x1="1" y1="1" x2="23" y2="23"></line>
+  </svg>
+);
+const FilePdfIcon = () => (
+  <svg
+    width="60"
+    height="60"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="#e62222"
+    strokeWidth="1.5"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+    <polyline points="14 2 14 8 20 8"></polyline>
+    <line x1="16" y1="13" x2="8" y2="13"></line>
+    <line x1="16" y1="17" x2="8" y2="17"></line>
+    <polyline points="10 9 9 9 8 9"></polyline>
+  </svg>
+);
+const FileExcelIcon = () => (
+  <svg
+    width="60"
+    height="60"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="#28a745"
+    strokeWidth="1.5"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+    <polyline points="14 2 14 8 20 8"></polyline>
+    <line x1="8" y1="13" x2="16" y2="17"></line>
+    <line x1="16" y1="13" x2="8" y2="17"></line>
+  </svg>
+);
+const SaveLayoutIcon = () => (
+  <svg
+    width="60"
+    height="60"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="#007bff"
+    strokeWidth="1.5"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+    <polyline points="17 21 17 13 7 13 7 21"></polyline>
+    <polyline points="7 3 7 8 15 8"></polyline>
+  </svg>
+);
+const HistoryLayoutIcon = () => (
+  <svg
+    width="60"
+    height="60"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="#6f42c1"
+    strokeWidth="1.5"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+    <line x1="12" y1="11" x2="12" y2="17"></line>
+    <line x1="9" y1="14" x2="15" y2="14"></line>
+  </svg>
+);
+const ArrowBackIcon = () => (
+  <svg
+    width="24"
+    height="24"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <line x1="19" y1="12" x2="5" y2="12"></line>
+    <polyline points="12 19 5 12 12 5"></polyline>
+  </svg>
+);
 
 function SortableImage({
   image,
@@ -389,7 +508,7 @@ function SortableImage({
     onMoveHere(image.id);
   };
 
-  const checkboxScale = Math.max(1, 1.3 / zoomLevel);
+  const checkboxScale = Math.max(1, 1.7 / zoomLevel);
   const buttonScale = Math.max(1, 1 / zoomLevel);
 
   return (
@@ -560,20 +679,16 @@ function DraggableMultipleImages({
 function App() {
   const [images, setImages] = useState<ImageType[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
-
   const [past, setPast] = useState<ImageType[][]>([]);
   const [future, setFuture] = useState<ImageType[][]>([]);
-
   const ignoreChangeRef = useRef(false);
   const previousImagesRef = useRef<ImageType[]>([]);
-
   const [gridCols, setGridCols] = useState(4);
   const [zoomLevel, setZoomLevel] = useState(1);
   const [isExporting, setIsExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState("");
   const [isExportingExcel, setIsExportingExcel] = useState(false);
   const [imageToDelete, setImageToDelete] = useState<string | null>(null);
-
   const [selectedImageIds, setSelectedImageIds] = useState<UniqueIdentifier[]>(
     []
   );
@@ -581,21 +696,28 @@ function App() {
     null
   );
   const [showSaveMessage, setShowSaveMessage] = useState(false);
+  const [showFloatingMenu, setShowFloatingMenu] = useState(false);
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [modalView, setModalView] = useState<"menu" | "save" | "load">("menu");
+  const [layoutHistory, setLayoutHistory] = useState<SavedLayout[]>([]);
+  const [mergedHistory, setMergedHistory] = useState<SavedLayout[]>([]);
+  const [newLayoutName, setNewLayoutName] = useState("");
+  const [selectedHistoryId, setSelectedHistoryId] = useState<string | null>(
+    null
+  );
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
+  const folderHistoryInputRef = useRef<HTMLInputElement>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 10 } })
   );
 
-  // 1. CARGA INTELIGENTE + MIGRACIÓN DE DATOS (RESCATE DE VERCEL)
   useEffect(() => {
     const loadData = async () => {
       try {
-        // A) Intentar cargar desde la base de datos nueva
         const dbData = await getFromDB(DB_KEY);
-
         if (dbData && Array.isArray(dbData) && dbData.length > 0) {
           setImages(dbData);
           previousImagesRef.current = dbData;
@@ -605,27 +727,36 @@ function App() {
             try {
               const parsedData = JSON.parse(localData);
               if (Array.isArray(parsedData) && parsedData.length > 0) {
-                console.log("Rescatando datos antiguos de localStorage...");
                 setImages(parsedData);
                 previousImagesRef.current = parsedData;
-
                 await saveToDB(DB_KEY, parsedData);
               }
             } catch (e) {
-              console.error("Error leyendo datos antiguos:", e);
+              console.error(e);
             }
           }
         }
       } catch (err) {
-        console.error("Error inicializando:", err);
+        console.error(err);
       } finally {
         setIsLoaded(true);
       }
     };
+    const savedHistory = localStorage.getItem(HISTORY_KEY);
+    if (savedHistory) {
+      try {
+        setLayoutHistory(JSON.parse(savedHistory));
+      } catch (e) {
+        console.error(e);
+      }
+    }
     loadData();
   }, []);
 
-  // 2. PROTECCIÓN DE SALIDA
+  useEffect(() => {
+    setMergedHistory(layoutHistory);
+  }, [layoutHistory]);
+
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       if (images.length > 0) {
@@ -640,13 +771,10 @@ function App() {
     };
   }, [images]);
 
-  // 3. HISTORIAL (UNDO/REDO)
   useEffect(() => {
     if (!isLoaded) return;
-
     const currentImagesJson = JSON.stringify(images);
     const previousImagesJson = JSON.stringify(previousImagesRef.current);
-
     if (currentImagesJson !== previousImagesJson) {
       if (!ignoreChangeRef.current) {
         const copyOfPrevious = JSON.parse(previousImagesJson);
@@ -659,42 +787,34 @@ function App() {
     }
   }, [images, isLoaded]);
 
-  // 4. AUTO-GUARDADO ASÍNCRONO EN INDEXEDDB (ILIMITADO)
   useEffect(() => {
     if (!isLoaded) return;
-    saveToDB(DB_KEY, images).catch((err) =>
-      console.error("Error auto-guardado", err)
-    );
+    saveToDB(DB_KEY, images).catch((err) => console.error(err));
   }, [images, isLoaded]);
 
   const handleManualSave = async () => {
     try {
       await saveToDB(DB_KEY, images);
       setShowSaveMessage(true);
-      setTimeout(() => {
-        setShowSaveMessage(false);
-      }, 2000);
+      setTimeout(() => setShowSaveMessage(false), 2000);
     } catch (e) {
-      console.error("Error al guardar manualmente:", e);
-      alert("Error al guardar. Verifica si tienes espacio en disco.");
+      console.error(e);
+      alert("Error al guardar.");
     }
   };
 
   const handleExportJSON = () => {
     const json = JSON.stringify(images);
     navigator.clipboard.writeText(json).then(() => {
-      alert("¡Datos copiados al portapapeles! Úsalo como respaldo.");
+      alert("Copiado al portapapeles.");
     });
   };
 
   const handleUndo = () => {
     if (past.length === 0) return;
-
     const previousState = past[past.length - 1];
     const newPast = past.slice(0, -1);
-
     ignoreChangeRef.current = true;
-
     setFuture((prev) => [images, ...prev]);
     setPast(newPast);
     setImages(previousState);
@@ -702,12 +822,9 @@ function App() {
 
   const handleRedo = () => {
     if (future.length === 0) return;
-
     const nextState = future[0];
     const newFuture = future.slice(1);
-
     ignoreChangeRef.current = true;
-
     setPast((prev) => [...prev, images]);
     setFuture(newFuture);
     setImages(nextState);
@@ -715,26 +832,20 @@ function App() {
 
   const handleToggleSelect = useCallback((id: UniqueIdentifier) => {
     setSelectedImageIds((prev) => {
-      if (prev.includes(id)) {
+      if (prev.includes(id))
         return prev.filter((selectedId) => selectedId !== id);
-      } else {
-        return [...prev, id];
-      }
+      else return [...prev, id];
     });
   }, []);
 
   const handleSelectAll = () => {
-    if (selectedImageIds.length === images.length) {
-      setSelectedImageIds([]);
-    } else {
-      setSelectedImageIds(images.map((img) => img.id));
-    }
+    if (selectedImageIds.length === images.length) setSelectedImageIds([]);
+    else setSelectedImageIds(images.map((img) => img.id));
   };
 
   const handleClearSelection = () => setSelectedImageIds([]);
   const handleUploadClick = () => fileInputRef.current?.click();
   const handleFolderUploadClick = () => folderInputRef.current?.click();
-
   const handleZoomIn = () => setZoomLevel((prev) => Math.min(prev + 0.1, 2.5));
   const handleZoomOut = () => setZoomLevel((prev) => Math.max(prev - 0.1, 0.3));
 
@@ -749,9 +860,7 @@ function App() {
       const targetIndex = remainingImages.findIndex(
         (img) => img.id === targetId
       );
-
       if (targetIndex === -1) return currentImages;
-
       const newOrder = [...remainingImages];
       newOrder.splice(targetIndex + 1, 0, ...itemsToMove);
       return newOrder;
@@ -763,7 +872,6 @@ function App() {
     if (jsonInput) {
       try {
         const parsedData = JSON.parse(jsonInput);
-
         if (Array.isArray(parsedData)) {
           const newImages: ImageType[] = parsedData.map((item: any) => ({
             id: crypto.randomUUID(),
@@ -771,17 +879,16 @@ function App() {
             name: item.ref || item.name || "Sin Referencia",
           }));
           const validImages = newImages.filter((img) => img.url);
-
           if (validImages.length > 0) {
             setImages((prev) => [...validImages, ...prev]);
             alert(`¡Listo! Se importaron ${validImages.length} imágenes.`);
           } else {
-            alert("No se encontraron imágenes válidas en el texto pegado.");
+            alert("No se encontraron imágenes válidas.");
           }
         }
       } catch (e) {
         console.error(e);
-        alert("El texto pegado no es un JSON válido o está incompleto.");
+        alert("JSON inválido.");
       }
     }
   };
@@ -857,21 +964,20 @@ function App() {
       ) as ImageType[];
       setImages((prev) => [...validNewImages, ...prev]);
       alert(
-        `Se procesaron ${
+        `Se cargaron ${validNewImages.length} imágenes de ${
           Object.keys(imagesByFolder).length
-        } carpetas y se cargaron ${validNewImages.length} imágenes.`
+        } carpetas.`
       );
     });
     event.target.value = "";
   };
 
   const handleDeleteSession = async () => {
-    if (window.confirm("¿Estás seguro de eliminar TODAS las imágenes?")) {
+    if (window.confirm("¿Eliminar TODAS las imágenes?")) {
       setImages([]);
       setSelectedImageIds([]);
       setPast([]);
       setFuture([]);
-      // Limpiamos de la base de datos y también del localStorage viejo por si acaso
       await clearDBKey(DB_KEY);
       localStorage.removeItem(LOCAL_STORAGE_KEY_OLD);
     }
@@ -894,8 +1000,120 @@ function App() {
     setSelectedImageIds([]);
   };
 
+  const handleSaveNewLayout = () => {
+    if (!newLayoutName.trim()) {
+      alert("Por favor escribe un nombre para el layout.");
+      return;
+    }
+    const now = new Date();
+    const formattedDate =
+      now.toLocaleDateString() + " " + now.toLocaleTimeString();
+    const newLayout: SavedLayout = {
+      id: crypto.randomUUID(),
+      name: newLayoutName,
+      date: formattedDate,
+      timestamp: Date.now(),
+      images: images,
+    };
+    const jsonString = JSON.stringify(newLayout, null, 2);
+    const blob = new Blob([jsonString], { type: "application/json" });
+    const href = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = href;
+    const safeFilename = newLayoutName
+      .replace(/[^a-z0-9]/gi, "_")
+      .toLowerCase();
+    link.download = `${safeFilename}_${now.getTime()}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(href);
+    alert(
+      `Se descargo exitosamente el json, por favor adjuntalo a la carpeta.`
+    );
+    setNewLayoutName("");
+    setModalView("menu");
+  };
+
+  const handleScanFolderClick = () => {
+    folderHistoryInputRef.current?.click();
+  };
+
+  const handleHistoryFolderChange = (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+    const externalLayouts: SavedLayout[] = [];
+    Array.from(files).forEach((file) => {
+      if (file.name.endsWith(".json")) {
+        externalLayouts.push({
+          id: `ext-${file.name}-${file.lastModified}`,
+          name: file.name.replace(".json", ""),
+          date: new Date(file.lastModified).toLocaleString(),
+          timestamp: file.lastModified,
+          images: [],
+          fileRef: file,
+        });
+      }
+    });
+    externalLayouts.sort((a, b) => b.timestamp - a.timestamp);
+    setMergedHistory([...externalLayouts, ...layoutHistory]);
+    alert(
+      `Se encontraron ${externalLayouts.length} layouts en la carpeta seleccionada.`
+    );
+    event.target.value = "";
+  };
+
+  const handleLoadSelectedLayout = () => {
+    if (!selectedHistoryId) return;
+    const layoutToLoad = mergedHistory.find((l) => l.id === selectedHistoryId);
+    if (layoutToLoad) {
+      const confirmMsg = `¿Cargar layout "${layoutToLoad.name}"? Se reemplazará la sesión actual.`;
+      if (window.confirm(confirmMsg)) {
+        if (layoutToLoad.fileRef) {
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            try {
+              const json = e.target?.result as string;
+              const parsedData = JSON.parse(json);
+              let imagesToLoad: ImageType[] = [];
+              if (parsedData.images && Array.isArray(parsedData.images)) {
+                imagesToLoad = parsedData.images;
+              } else if (Array.isArray(parsedData)) {
+                imagesToLoad = parsedData;
+              }
+              if (imagesToLoad.length > 0) {
+                setImages(imagesToLoad);
+                finalizeLoad();
+              } else {
+                alert("El archivo JSON está vacío o dañado.");
+              }
+            } catch (err) {
+              console.error(err);
+              alert("Error leyendo el archivo JSON seleccionado.");
+            }
+          };
+          reader.readAsText(layoutToLoad.fileRef);
+        } else {
+          setImages(layoutToLoad.images);
+          finalizeLoad();
+        }
+      }
+    }
+  };
+
+  const finalizeLoad = () => {
+    setSelectedImageIds([]);
+    setPast([]);
+    setFuture([]);
+    setShowExportModal(false);
+    setModalView("menu");
+  };
+
   const handleExportPDF = async () => {
     setIsExporting(true);
+    setShowExportModal(false);
     const rootElement = document.getElementById("root") as HTMLElement;
     const controls = document.querySelector(".controls") as HTMLElement;
     const deleteBtn = document.querySelector(
@@ -907,48 +1125,36 @@ function App() {
     const zoomControls = document.querySelector(
       ".zoom-controls"
     ) as HTMLElement;
-
     const moveButtons = document.querySelectorAll(
       "button[data-html2canvas-ignore='true']"
     );
-
     if (controls) controls.style.display = "none";
     if (deleteBtn) deleteBtn.style.display = "none";
     if (zoomControls) zoomControls.style.display = "none";
     deleteImgBtns.forEach((btn) => (btn.style.display = "none"));
     moveButtons.forEach((btn) => ((btn as HTMLElement).style.display = "none"));
-
     const checkboxes = document.querySelectorAll(
       ".checkbox-container"
     ) as NodeListOf<HTMLElement>;
     checkboxes.forEach((box) => (box.style.display = "none"));
-
     const allImageContainers = Array.from(
       document.querySelectorAll(".sortable-image-container")
     ) as HTMLElement[];
     const totalFilesNeeded = Math.ceil(
       allImageContainers.length / ITEMS_PER_PDF_FILE
     );
-
     const originalTransform = rootElement.style.transform;
     const originalTransformOrigin = rootElement.style.transformOrigin;
-
     rootElement.style.transform = "none";
     rootElement.style.transformOrigin = "top left";
-
     try {
       for (let i = 0; i < totalFilesNeeded; i++) {
-        setExportProgress(
-          `Generando Archivo ${i + 1} de ${totalFilesNeeded}...`
-        );
+        setExportProgress(`Generando PDF ${i + 1} de ${totalFilesNeeded}...`);
         const start = i * ITEMS_PER_PDF_FILE;
         const end = start + ITEMS_PER_PDF_FILE;
         allImageContainers.forEach((container, index) => {
-          if (index >= start && index < end) {
-            container.style.display = "flex";
-          } else {
-            container.style.display = "none";
-          }
+          if (index >= start && index < end) container.style.display = "flex";
+          else container.style.display = "none";
         });
         await new Promise((resolve) => setTimeout(resolve, 200));
         const canvas = await html2canvas(rootElement, {
@@ -980,11 +1186,10 @@ function App() {
       }
     } catch (error) {
       console.error(error);
-      alert("Hubo un error generando los PDFs.");
+      alert("Error generando PDFs.");
     } finally {
       rootElement.style.transform = originalTransform;
       rootElement.style.transformOrigin = originalTransformOrigin;
-
       allImageContainers.forEach(
         (container) => (container.style.display = "flex")
       );
@@ -1001,6 +1206,7 @@ function App() {
 
   const handleExportExcel = async () => {
     setIsExportingExcel(true);
+    setShowExportModal(false);
     try {
       const workbook = new Workbook();
       const worksheet = workbook.addWorksheet("Listado de Imagenes");
@@ -1034,15 +1240,12 @@ function App() {
   function handleDragStart(event: DragStartEvent) {
     const { active } = event;
     setActiveDragId(active.id);
-    if (!selectedImageIds.includes(active.id)) {
-      setSelectedImageIds([active.id]);
-    }
+    if (!selectedImageIds.includes(active.id)) setSelectedImageIds([active.id]);
   }
 
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
     setActiveDragId(null);
-
     if (over && active.id !== over.id) {
       setImages((currentImages) => {
         const activeIndex = currentImages.findIndex(
@@ -1051,7 +1254,6 @@ function App() {
         const overIndex = currentImages.findIndex(
           (item) => item.id === over.id
         );
-
         if (
           selectedImageIds.length > 1 &&
           selectedImageIds.includes(active.id)
@@ -1065,26 +1267,206 @@ function App() {
           let insertIndex = itemsRemaining.findIndex(
             (item) => item.id === over.id
           );
-
-          if (insertIndex === -1) {
+          if (insertIndex === -1)
             return arrayMove(currentImages, activeIndex, overIndex);
-          }
           const newOrder = [...itemsRemaining];
-          if (activeIndex < overIndex) {
+          if (activeIndex < overIndex)
             newOrder.splice(insertIndex + 1, 0, ...itemsToMove);
-          } else {
-            newOrder.splice(insertIndex, 0, ...itemsToMove);
-          }
+          else newOrder.splice(insertIndex, 0, ...itemsToMove);
           return newOrder;
         }
         return arrayMove(currentImages, activeIndex, overIndex);
       });
     }
-
-    if (selectedImageIds.length === 1 && selectedImageIds.includes(active.id)) {
+    if (selectedImageIds.length === 1 && selectedImageIds.includes(active.id))
       setSelectedImageIds([]);
-    }
   }
+
+  const renderModalContent = () => {
+    if (modalView === "menu") {
+      return (
+        <>
+          <div className="export-option-card" onClick={handleExportPDF}>
+            <div className="export-icon">
+              <FilePdfIcon />
+            </div>
+            <h3>Exportar PDF</h3>
+            <p>Genera un archivo PDF con el catálogo visual.</p>
+          </div>
+          <div className="export-option-card" onClick={handleExportExcel}>
+            <div className="export-icon">
+              <FileExcelIcon />
+            </div>
+            <h3>Exportar Excel</h3>
+            <p>Descarga un listado .xlsx con los nombres.</p>
+          </div>
+          <div
+            className="export-option-card"
+            onClick={() => setModalView("save")}
+          >
+            <div className="export-icon">
+              <SaveLayoutIcon />
+            </div>
+            <h3>Guardar Layout</h3>
+            <p>Descarga el JSON a tu carpeta de historial.</p>
+          </div>
+          <div
+            className="export-option-card"
+            onClick={() => setModalView("load")}
+          >
+            <div className="export-icon">
+              <HistoryLayoutIcon />
+            </div>
+            <h3>Historial / Layouts</h3>
+            <p>Carga sesiones desde tu carpeta local.</p>
+          </div>
+        </>
+      );
+    } else if (modalView === "save") {
+      return (
+        <div className="modal-sub-view">
+          <div className="modal-header-nav">
+            <button className="back-btn" onClick={() => setModalView("menu")}>
+              <ArrowBackIcon />
+            </button>
+            <h2>Guardar Nuevo Layout</h2>
+          </div>
+          <div className="save-form">
+            <p>
+              Se descargará un archivo JSON. Guárdalo en: <br />
+              <strong>...\src\historial layout</strong>
+            </p>
+            <input
+              type="text"
+              placeholder="Nombre de la colección..."
+              value={newLayoutName}
+              onChange={(e) => setNewLayoutName(e.target.value)}
+              className="layout-name-input"
+              autoFocus
+            />
+            <button className="btn-v" onClick={handleSaveNewLayout}>
+              <span className="btn-v_lg" style={{ background: "#007bff" }}>
+                <span
+                  className="btn-v_sl"
+                  style={{ background: "#0056b3" }}
+                ></span>
+                <span className="btn-v_text">Descargar Archivo</span>
+              </span>
+            </button>
+          </div>
+        </div>
+      );
+    } else if (modalView === "load") {
+      return (
+        <div className="modal-sub-view">
+          <div className="modal-header-nav">
+            <button className="back-btn" onClick={() => setModalView("menu")}>
+              <ArrowBackIcon />
+            </button>
+            <h2>Cargar Layouts</h2>
+          </div>
+          <div
+            style={{
+              marginBottom: "15px",
+              display: "flex",
+              justifyContent: "center",
+            }}
+          >
+            <input
+              type="file"
+              {...({ webkitdirectory: "", directory: "" } as any)}
+              ref={folderHistoryInputRef}
+              style={{ display: "none" }}
+              onChange={handleHistoryFolderChange}
+            />
+            <button
+              className="btn-v"
+              onClick={handleScanFolderClick}
+              style={{ width: "auto", marginBottom: 0 }}
+            >
+              <span
+                className="btn-v_lg"
+                style={{ background: "#6f42c1", padding: "8px 20px" }}
+              >
+                <span
+                  className="btn-v_sl"
+                  style={{ background: "#5a32a3" }}
+                ></span>
+                <span className="btn-v_text" style={{ fontSize: "14px" }}>
+                  Escanear Carpeta
+                </span>
+              </span>
+            </button>
+          </div>
+          <div className="history-list-container">
+            {mergedHistory.length === 0 ? (
+              <div
+                style={{
+                  textAlign: "center",
+                  color: "#666",
+                  marginTop: "20px",
+                }}
+              >
+                <p>No se han detectado layouts.</p>
+                <small>
+                  Dale clic a "Escanear Carpeta" y selecciona tu carpeta de
+                  historial.
+                </small>
+              </div>
+            ) : (
+              <div className="history-list">
+                {mergedHistory.map((layout) => (
+                  <div
+                    key={layout.id}
+                    className={`history-item ${
+                      selectedHistoryId === layout.id ? "active" : ""
+                    }`}
+                    onClick={() => setSelectedHistoryId(layout.id)}
+                  >
+                    <div className="history-info">
+                      <span className="history-name">
+                        {layout.fileRef ? "📄 " : "💾 "}
+                        {layout.name}
+                      </span>
+                      <span className="history-date">{layout.date}</span>
+                      <span className="history-count">
+                        {layout.fileRef
+                          ? "Archivo Físico"
+                          : `${layout.images.length} imgs`}
+                      </span>
+                    </div>
+                    <div className="history-check">
+                      <div
+                        className={`custom-radio ${
+                          selectedHistoryId === layout.id ? "checked" : ""
+                        }`}
+                      ></div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          <div className="load-actions" style={{ justifyContent: "flex-end" }}>
+            <button
+              className="btn-v"
+              onClick={handleLoadSelectedLayout}
+              disabled={!selectedHistoryId}
+              style={{ opacity: !selectedHistoryId ? 0.5 : 1, marginBottom: 0 }}
+            >
+              <span className="btn-v_lg" style={{ background: "#28a745" }}>
+                <span
+                  className="btn-v_sl"
+                  style={{ background: "#1e7e34" }}
+                ></span>
+                <span className="btn-v_text">Cargar Layout</span>
+              </span>
+            </button>
+          </div>
+        </div>
+      );
+    }
+  };
 
   return (
     <>
@@ -1096,7 +1478,6 @@ function App() {
           </div>
         </div>
       )}
-
       {showSaveMessage && (
         <div
           style={{
@@ -1117,7 +1498,23 @@ function App() {
           progreso actual guardado
         </div>
       )}
-
+      {showExportModal && (
+        <div
+          className="export-modal-overlay"
+          onClick={() => {
+            setShowExportModal(false);
+            setModalView("menu");
+          }}
+          data-html2canvas-ignore="true"
+        >
+          <div
+            className="export-modal-content"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {renderModalContent()}
+          </div>
+        </div>
+      )}
       <div
         className="app-zoom-wrapper"
         style={{
@@ -1141,7 +1538,6 @@ function App() {
             <span>INICIAR SESIÓN</span>
           </div>
         </div>
-
         <header className="main-header">
           <div className="header-content">
             <div className="header-left">
@@ -1176,7 +1572,6 @@ function App() {
             </div>
           </div>
         </header>
-
         <main>
           <picture className="banner">
             <source srcSet={bannerMobile} media="(max-width: 767px)" />
@@ -1187,9 +1582,7 @@ function App() {
               className="banner-img"
             />
           </picture>
-
           <h1 className="main-title"></h1>
-
           <div className="controls">
             <input
               type="file"
@@ -1208,7 +1601,6 @@ function App() {
               {...({ webkitdirectory: "" } as any)}
               style={{ display: "none" }}
             />
-
             <button className="btn-v" onClick={handleUploadClick}>
               <span className="btn-v_lg">
                 <span className="btn-v_sl"></span>
@@ -1233,9 +1625,11 @@ function App() {
                 <span className="btn-v_text">Importar JSON</span>
               </span>
             </button>
-
-            {/* Nuevo botón de respaldo manual por seguridad */}
-            <button className="btn-v" onClick={handleExportJSON}>
+            <button
+              className="btn-v"
+              onClick={handleExportJSON}
+              style={{ display: "none" }}
+            >
               <span
                 className="btn-v_lg"
                 style={{ background: "#6f42c1", color: "#fff" }}
@@ -1247,12 +1641,11 @@ function App() {
                 <span className="btn-v_text">Copiar Respaldo</span>
               </span>
             </button>
-
             {images.length > 0 && (
               <button className="btn-v" onClick={handleSelectAll}>
                 <span
                   className="btn-v_lg"
-                  style={{ background: "#007bff", color: "#fff" }}
+                  style={{ background: "#0f1923", color: "#fff" }}
                 >
                   <span
                     className="btn-v_sl"
@@ -1280,50 +1673,24 @@ function App() {
                 </span>
               </button>
             )}
-
             <button
-              className="btn-uiverse-dl"
-              type="button"
-              onClick={handleExportPDF}
-              disabled={isExporting}
+              className="btn-v"
+              onClick={() => {
+                setShowExportModal(true);
+                setModalView("menu");
+              }}
             >
-              <span className="btn-uiverse-dl__text">
-                {isExporting ? "Procesando..." : "Exportar PDF"}
-              </span>
-              <span className="btn-uiverse-dl__icon">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 35 35"
-                  className="svg"
-                >
-                  <path d="M17.5,22.131a1.249,1.249,0,0,1-1.25-1.25V2.187a1.25,1.25,0,0,1,2.5,0V20.881A1.25,1.25,0,0,1,17.5,22.131Z"></path>
-                  <path d="M17.5,22.693a3.189,3.189,0,0,1-2.262-.936L8.487,15.006a1.249,1.249,0,0,1,1.767-1.767l6.751,6.751a.7.7,0,0,0,.99,0l6.751-6.751a1.25,1.25,0,0,1,1.768,1.767l-6.752,6.751A3.191,3.191,0,0,1,17.5,22.693Z"></path>
-                  <path d="M31.436,34.063H3.564A3.318,3.318,0,0,1,.25,30.749V22.011a1.25,1.25,0,0,1,2.5,0v8.738a.815.815,0,0,0,.814.814H31.436a.815.815,0,0,0,.814-.814V22.011a1.25,1.25,0,1,1,2.5,0v8.738A3.318,3.318,0,0,1,31.436,34.063Z"></path>
-                </svg>
+              <span
+                className="btn-v_lg"
+                style={{ background: "#0f1923", color: "#fff" }}
+              >
+                <span
+                  className="btn-v_sl"
+                  style={{ background: "#333" }}
+                ></span>
+                <span className="btn-v_text">Más Opciones</span>
               </span>
             </button>
-            <button
-              className="btn-uiverse-dl"
-              type="button"
-              onClick={handleExportExcel}
-              disabled={isExportingExcel}
-            >
-              <span className="btn-uiverse-dl__text">
-                {isExportingExcel ? "Generando..." : "Descargar Excel"}
-              </span>
-              <span className="btn-uiverse-dl__icon">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 35 35"
-                  className="svg"
-                >
-                  <path d="M17.5,22.131a1.249,1.249,0,0,1-1.25-1.25V2.187a1.25,1.25,0,0,1,2.5,0V20.881A1.25,1.25,0,0,1,17.5,22.131Z"></path>
-                  <path d="M17.5,22.693a3.189,3.189,0,0,1-2.262-.936L8.487,15.006a1.249,1.249,0,0,1,1.767-1.767l6.751,6.751a.7.7,0,0,0,.99,0l6.751-6.751a1.25,1.25,0,0,1,1.768,1.767l-6.752,6.751A3.191,3.191,0,0,1,17.5,22.693Z"></path>
-                  <path d="M31.436,34.063H3.564A3.318,3.318,0,0,1,.25,30.749V22.011a1.25,1.25,0,0,1,2.5,0v8.738a.815.815,0,0,0,.814.814H31.436a.815.815,0,0,0,.814-.814V22.011a1.25,1.25,0,1,1,2.5,0v8.738A3.318,3.318,0,0,1,31.436,34.063Z"></path>
-                </svg>
-              </span>
-            </button>
-
             <div className="layout-toggles">
               <button
                 className={`toggle-btn ${gridCols === 2 ? "active" : ""}`}
@@ -1348,7 +1715,6 @@ function App() {
               </button>
             </div>
           </div>
-
           <DndContext
             sensors={sensors}
             collisionDetection={closestCorners}
@@ -1376,7 +1742,6 @@ function App() {
                 ))}
               </div>
             </SortableContext>
-
             <DragOverlay
               dropAnimation={dropAnimationConfig}
               modifiers={[snapCenterToCursor]}
@@ -1386,14 +1751,11 @@ function App() {
                   images={images}
                   activeId={activeDragId}
                   selectedImages={selectedImageIds}
-                  style={{
-                    transform: `scale(${zoomLevel})`,
-                  }}
+                  style={{ transform: `scale(${zoomLevel})` }}
                 />
               ) : null}
             </DragOverlay>
           </DndContext>
-
           {images.length > 0 && (
             <div className="delete-session-container">
               <button className="noselect" onClick={handleDeleteSession}>
@@ -1413,54 +1775,60 @@ function App() {
           )}
         </main>
       </div>
-
       <div className="zoom-controls">
-        <button
-          className="zoom-btn"
-          onClick={handleUploadClick}
-          title="Subir Fotos Rápidamente"
-          style={{ backgroundColor: "#28a745", color: "#fff" }}
+        <div
+          className={`floating-menu-items ${showFloatingMenu ? "open" : ""}`}
         >
-          <PlusIcon />
-        </button>
-
+          <button
+            className="zoom-btn"
+            onClick={handleUploadClick}
+            title="Subir Fotos Rápidamente"
+            style={{ backgroundColor: "#28a745", color: "#fff" }}
+          >
+            <PlusIcon />
+          </button>
+          <button
+            className="zoom-btn"
+            onClick={handleRedo}
+            title="Rehacer"
+            disabled={future.length === 0}
+            style={{ opacity: future.length === 0 ? 0.5 : 1 }}
+          >
+            <RedoIcon />
+          </button>
+          <button
+            className="zoom-btn"
+            onClick={handleUndo}
+            title="Deshacer"
+            disabled={past.length === 0}
+            style={{ opacity: past.length === 0 ? 0.5 : 1 }}
+          >
+            <UndoIcon />
+          </button>
+          <button className="zoom-btn" onClick={handleZoomIn} title="Acercar">
+            <ZoomInIcon />
+          </button>
+          <button className="zoom-btn" onClick={handleZoomOut} title="Alejar">
+            <ZoomOutIcon />
+          </button>
+          <button
+            className="zoom-btn"
+            onClick={handleManualSave}
+            title="Guardar Progreso Manualmente"
+            style={{ backgroundColor: "#007bff", color: "#fff" }}
+          >
+            <CheckIcon />
+          </button>
+        </div>
         <button
-          className="zoom-btn"
-          onClick={handleRedo}
-          title="Rehacer (Ctrl+Y)"
-          disabled={future.length === 0}
-          style={{ opacity: future.length === 0 ? 0.5 : 1 }}
+          className="zoom-btn toggle-menu-btn"
+          onClick={() => setShowFloatingMenu(!showFloatingMenu)}
+          title={showFloatingMenu ? "Ocultar menú" : "Mostrar menú"}
+          style={{ backgroundColor: "#000", color: "#fff", zIndex: 1001 }}
         >
-          <RedoIcon />
-        </button>
-
-        <button
-          className="zoom-btn"
-          onClick={handleUndo}
-          title="Deshacer (Ctrl+Z)"
-          disabled={past.length === 0}
-          style={{ opacity: past.length === 0 ? 0.5 : 1 }}
-        >
-          <UndoIcon />
-        </button>
-
-        <button className="zoom-btn" onClick={handleZoomIn} title="Acercar">
-          <ZoomInIcon />
-        </button>
-        <button className="zoom-btn" onClick={handleZoomOut} title="Alejar">
-          <ZoomOutIcon />
-        </button>
-
-        <button
-          className="zoom-btn"
-          onClick={handleManualSave}
-          title="Guardar Progreso Manualmente"
-          style={{ backgroundColor: "#007bff", color: "#fff" }}
-        >
-          <CheckIcon />
+          {showFloatingMenu ? <EyeOpenIcon /> : <EyeClosedIcon />}
         </button>
       </div>
-
       {imageToDelete && (
         <div className="modal-overlay">
           <div className="modal-content">
