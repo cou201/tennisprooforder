@@ -13,7 +13,7 @@ import {
   type UniqueIdentifier,
   type DragStartEvent,
   type DropAnimation,
-  defaultDropAnimationSideEffects,
+  defaultDropAnimationSideEffects
 } from "@dnd-kit/core";
 import { type DragEndEvent } from "@dnd-kit/core";
 import { restrictToWindowEdges, snapCenterToCursor } from "@dnd-kit/modifiers";
@@ -21,7 +21,7 @@ import {
   arrayMove,
   SortableContext,
   useSortable,
-  rectSortingStrategy,
+  rectSortingStrategy
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 
@@ -104,10 +104,10 @@ const dropAnimationConfig: DropAnimation = {
   sideEffects: defaultDropAnimationSideEffects({
     styles: {
       active: {
-        opacity: "0.5",
-      },
-    },
-  }),
+        opacity: "0.5"
+      }
+    }
+  })
 };
 
 const SearchIcon = () => (
@@ -432,7 +432,7 @@ function SortableImage({
   hasSelection,
   onMoveHere,
   selectedCount,
-  onDeleteSelected,
+  onDeleteSelected
 }: {
   image: ImageType;
   onDelete: (id: string) => void;
@@ -452,7 +452,7 @@ function SortableImage({
     setNodeRef,
     transform,
     transition,
-    isDragging,
+    isDragging
   } = useSortable({ id: image.id });
 
   const style: React.CSSProperties = {
@@ -461,7 +461,7 @@ function SortableImage({
         ? {
             ...transform,
             x: transform.x / zoomLevel,
-            y: transform.y / zoomLevel,
+            y: transform.y / zoomLevel
           }
         : null
     ),
@@ -469,7 +469,7 @@ function SortableImage({
     zIndex: isDragging ? 10 : "auto",
     opacity: isDragging ? 0.2 : 1,
     touchAction: "none",
-    position: "relative",
+    position: "relative"
   };
 
   const isBatchDeleteMode = isSelected && selectedCount >= 2;
@@ -543,7 +543,7 @@ function SortableImage({
             display: "flex",
             alignItems: "center",
             gap: "5px",
-            whiteSpace: "nowrap",
+            whiteSpace: "nowrap"
           }}
         >
           <span>Mover Aquí</span>
@@ -561,7 +561,7 @@ function SortableImage({
           style={{
             transform: `scale(${checkboxScale})`,
             transformOrigin: "center center",
-            cursor: "pointer",
+            cursor: "pointer"
           }}
         />
       </div>
@@ -594,7 +594,7 @@ function SortableImage({
         data-html2canvas-ignore="true"
         style={{
           backgroundColor: isBatchDeleteMode ? "#dc3545" : undefined,
-          fontWeight: isBatchDeleteMode ? "bold" : "normal",
+          fontWeight: isBatchDeleteMode ? "bold" : "normal"
         }}
       >
         {isBatchDeleteMode ? "borrar conjunto de imagenes" : "Eliminar Imagen"}
@@ -607,7 +607,7 @@ function DraggableMultipleImages({
   images,
   activeId,
   selectedImages,
-  style,
+  style
 }: {
   images: ImageType[];
   activeId: UniqueIdentifier | null;
@@ -618,8 +618,8 @@ function DraggableMultipleImages({
     selectedImages.length > 0
       ? images.filter((img) => selectedImages.includes(img.id))
       : activeId
-      ? [images.find((img) => img.id === activeId)!]
-      : [];
+        ? [images.find((img) => img.id === activeId)!]
+        : [];
 
   if (itemsToShow.length === 0) return null;
 
@@ -635,7 +635,7 @@ function DraggableMultipleImages({
         boxShadow: "0 15px 30px rgba(0,0,0,0.4)",
         width: "180px",
         pointerEvents: "none",
-        ...style,
+        ...style
       }}
     >
       <div
@@ -644,7 +644,7 @@ function DraggableMultipleImages({
           marginBottom: "5px",
           textAlign: "center",
           color: "#000",
-          fontSize: "14px",
+          fontSize: "14px"
         }}
       >
         Moviendo {itemsToShow.length} ítems
@@ -655,7 +655,7 @@ function DraggableMultipleImages({
           gap: "5px",
           overflow: "hidden",
           height: "60px",
-          justifyContent: "center",
+          justifyContent: "center"
         }}
       >
         {itemsToShow.slice(0, 3).map((img) => (
@@ -667,7 +667,7 @@ function DraggableMultipleImages({
               height: "50px",
               objectFit: "cover",
               borderRadius: "4px",
-              border: "1px solid #ddd",
+              border: "1px solid #ddd"
             }}
           />
         ))}
@@ -876,7 +876,7 @@ function App() {
           const newImages: ImageType[] = parsedData.map((item: any) => ({
             id: crypto.randomUUID(),
             url: item.image || item.url,
-            name: item.ref || item.name || "Sin Referencia",
+            name: item.ref || item.name || "Sin Referencia"
           }));
           const validImages = newImages.filter((img) => img.url);
           if (validImages.length > 0) {
@@ -907,7 +907,7 @@ function App() {
           resolve({
             id: crypto.randomUUID(),
             url: reader.result as string,
-            name: file.name,
+            name: file.name
           });
         reader.onerror = (error) => reject(error);
         reader.readAsDataURL(file);
@@ -951,7 +951,7 @@ function App() {
           resolve({
             id: crypto.randomUUID(),
             url: reader.result as string,
-            name: file.name,
+            name: file.name
           });
         reader.onerror = (error) => reject(error);
         reader.readAsDataURL(file);
@@ -1013,7 +1013,7 @@ function App() {
       name: newLayoutName,
       date: formattedDate,
       timestamp: Date.now(),
-      images: images,
+      images: images
     };
     const jsonString = JSON.stringify(newLayout, null, 2);
     const blob = new Blob([jsonString], { type: "application/json" });
@@ -1053,7 +1053,7 @@ function App() {
           date: new Date(file.lastModified).toLocaleString(),
           timestamp: file.lastModified,
           images: [],
-          fileRef: file,
+          fileRef: file
         });
       }
     });
@@ -1164,7 +1164,7 @@ function App() {
           windowWidth: document.documentElement.offsetWidth,
           ignoreElements: (element) =>
             element.hasAttribute("data-html2canvas-ignore"),
-          backgroundColor: "#ffffff",
+          backgroundColor: "#ffffff"
         });
         const imgData = canvas.toDataURL("image/png");
         const pdf = new jsPDF("p", "mm", "a4");
@@ -1222,7 +1222,7 @@ function App() {
       }
       const buffer = await workbook.xlsx.writeBuffer();
       const blob = new Blob([buffer], {
-        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
       });
       const link = document.createElement("a");
       link.href = URL.createObjectURL(blob);
@@ -1369,7 +1369,7 @@ function App() {
             style={{
               marginBottom: "15px",
               display: "flex",
-              justifyContent: "center",
+              justifyContent: "center"
             }}
           >
             <input
@@ -1404,7 +1404,7 @@ function App() {
                 style={{
                   textAlign: "center",
                   color: "#666",
-                  marginTop: "20px",
+                  marginTop: "20px"
                 }}
               >
                 <p>No se han detectado layouts.</p>
@@ -1470,11 +1470,11 @@ function App() {
 
   return (
     <>
-      {isExporting && (
+      {(isExporting || isExportingExcel) && (
         <div className="export-overlay" data-html2canvas-ignore="true">
           <div className="export-message">
             <div className="spinner"></div>
-            <p>{exportProgress}</p>
+            <p>{isExportingExcel ? "Generando Excel..." : exportProgress}</p>
           </div>
         </div>
       )}
@@ -1492,7 +1492,7 @@ function App() {
             zIndex: 9999,
             fontWeight: "bold",
             boxShadow: "0 4px 6px rgba(0,0,0,0.1)",
-            pointerEvents: "none",
+            pointerEvents: "none"
           }}
         >
           progreso actual guardado
@@ -1522,7 +1522,7 @@ function App() {
           transformOrigin: "top left",
           width: "100%",
           minHeight: "100vh",
-          display: isLoaded ? "block" : "none",
+          display: isLoaded ? "block" : "none"
         }}
       >
         <div className="top-bar">
